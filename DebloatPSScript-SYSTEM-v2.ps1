@@ -56,6 +56,8 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 
 # Set Variables and Ensure Script is running as Admin.
 
+	$EnableUserLogonScript = "Yes"
+
 	$ErrorActionPreference = 'SilentlyContinue'
 	$NotificationColor = 'Yellow'
 
@@ -105,7 +107,8 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 		"*Print3D*"
 		# "*RemoteDesktop*"                        
 		"*SkypeApp*"
-		# "*Whiteboard*"                           
+		# "*Whiteboard*"
+		"*ScreenSketch*"                           
 		"*WindowsAlarms*"
 		"*windowscommunicationsapps*"
 		"*WindowsFeedbackHub*"
@@ -119,7 +122,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 		"*XboxSpeechToTextOverlay*"
 		"*ZuneMusic*"
 		"*ZuneVideo*"
-		# "*YourPhone*"
+		"*YourPhone*"
 		"*MixedReality*"
 		"*StickyNotes*"
 		"*Wallet*"
@@ -134,7 +137,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 		"*Flipboard*"
 		"*Facebook*"
 		"*Twitter*"
-		# "*Spotify*"
+		"*Spotify*"
 		"*Minecraft*"
 		"*Royal Revolt*"
 		"*Sway*"
@@ -143,6 +146,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 		"*MSPaint*" # This is Paint 3D, NOT the old-school MSPaint
 		"*LenovoCompanion*"
 		"*Instagram*"
+		"*WebExperience*" # This is the Windows 11 Widgets BS Microsof thas thrown in to the new OS. Remove Widgets entirely.
 		
 	)
 
@@ -156,11 +160,29 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 	}
 
 
-# User Logon Script - Coming Soon.
+# User Logon Script
 
-	#	If $EnableUserLogonScript = "Yes" 
+	If ( $EnableUserLogonScript = "Yes") { 
 
-	#	New-Item -Path "HKEY_USERS\Test\Software\Microsoft\Windows\CurrentVersion\Runonce" | Out-Null
+        Write-Host -ForegroundColor $NotificationColor "Creating Directories 'C:\Windows\FirstUserLogon' and Copying files"
+
+		mkdir C:\Windows\FirstUserLogon -ErrorAction SilentlyContinue
+		Copy-Item "DebloatScript-HKCU.ps1" "C:\Windows\FirstUserLogon\DebloatScript-HKCU.ps1"
+		Copy-Item "FirstLogon.bat" "C:\Windows\FirstUserLogon\FirstLogon.bat"
+        Write-Host
+
+		REG LOAD HKEY_Users\DefaultUser "C:\Users\Default\NTUSER.DAT"
+        Write-Host -ForegroundColor $NotificationColor "Enabling Registry Keys to run Logon Script"
+
+	    Set-ItemProperty -Path "REGISTRY::HKEY_USERS\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Run" -Name "FirstUserLogon" -Value "C:\Windows\FirstUserLogon\FirstLogon.bat" -Type "String"
+
+		REG UNLOAD HKEY_Users\DefaultUser
+
+		Write-Host -ForegroundColor $NotificationColor "New User Logon Script Successfully Enabled"
+
+	}
+	
+
 
 
 # Registry Tweaks
