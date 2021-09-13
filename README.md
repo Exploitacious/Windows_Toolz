@@ -6,7 +6,7 @@ This powershell script accomplishes the follwoing objectives:
 Registry Tweaks
 	- Disables Telemetry by Microsoft / Windows
 	- Disables Windows Preview Builds
-	- Disables Wi-Fi Sense (https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&cad=rja&uact=8&ved=2ahUKEwiy3qmx1MzyAhXURTABHVlSCUIQFnoECAcQAQ&url=https%3A%2F%2Fwww.lifewire.com%2Fwhat-is-wifi-sense-windows-10-4586925&usg=AOvVaw14UdBdVJlIKdrzTSu3c9LN)
+	- Disables Wi-Fi Sense
 	- Disables Bing Search in Start-Menu
 	- Disables Suggested Applications
 	- Disables Feedback
@@ -36,8 +36,8 @@ Windows Appx Bloatware Perma-Uninstall List
 	- To add or remove bloatware apps from this list, simply add then in quotes with wildcard * symbols.
 	- To make sure they'll be picked up and removed, test them on a machine by running:  get-appxpackage -name *appName*
 
-Per-User first-time logon script to tweak user interface - Coming soon!
-	- My goal is to deploy a mini script to run at first-time-logon for each user on the system to tweak the user interface into being nice and clean.
-	- Will run as per-user context.
-	
-	Stay tuned!
+Per-User first-time logon script to clean up user interface
+
+* Make sure you download BOTH the FirstLogon.bat file and DebloatScript-HKCU.ps1 into the same directory as the main System Debloat Script.
+ - A copy of the Bat and HKCU will be placed in C:\Windows\FirstUserLogon and ran every time a user logs in for the FIRST TIME ONLY.
+ - This 'mini' script cleans up the user interface and removes some of the clutter that Windows 10 likes to throw at you.
