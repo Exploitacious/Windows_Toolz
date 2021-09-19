@@ -56,7 +56,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 
 # Set Variables and Ensure Script is running as Admin.
 
-	$EnableUserLogonScript = "Yes"
+	$EnableUserLogonScript = Read-Host "Would you like this script to configure the first-time user logon script?"
 
 	$ErrorActionPreference = 'SilentlyContinue'
 	$NotificationColor = 'Yellow'
@@ -158,31 +158,6 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 			Get-AppxPackage -Name $App -AllUsers | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue -Verbose
 			Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like $App | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue -Verbose
 	}
-
-
-# User Logon Script
-
-	If ( $EnableUserLogonScript = "Yes") { 
-
-        Write-Host -ForegroundColor $NotificationColor "Creating Directories 'C:\Windows\FirstUserLogon' and Copying files"
-
-		mkdir C:\Windows\FirstUserLogon -ErrorAction SilentlyContinue
-		Copy-Item "DebloatScript-HKCU.ps1" "C:\Windows\FirstUserLogon\DebloatScript-HKCU.ps1"
-		Copy-Item "FirstLogon.bat" "C:\Windows\FirstUserLogon\FirstLogon.bat"
-        Write-Host
-
-		REG LOAD HKEY_Users\DefaultUser "C:\Users\Default\NTUSER.DAT"
-        Write-Host -ForegroundColor $NotificationColor "Enabling Registry Keys to run Logon Script"
-
-	    Set-ItemProperty -Path "REGISTRY::HKEY_USERS\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Run" -Name "FirstUserLogon" -Value "C:\Windows\FirstUserLogon\FirstLogon.bat" -Type "String"
-
-		REG UNLOAD HKEY_Users\DefaultUser
-
-		Write-Host -ForegroundColor $NotificationColor "New User Logon Script Successfully Enabled"
-
-	}
-	
-
 
 
 # Registry Tweaks
@@ -470,11 +445,33 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 			}
 			Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "HideSCAMeetNow" -Type DWord -Value 1
 
+	# Run the User-Config Script
+	./DebloatScript-HKCU.ps1
+	
 
+# Implement User Logon Script
 
-	Write-Host -ForegroundColor Red "It is recommended to restart the computer now"
+If ( $EnableUserLogonScript -eq "Yes" -or $EnableUserLogonScript -eq "Y") { 
+	Write-Host -ForegroundColor $NotificationColor "Creating Directories 'C:\Windows\FirstUserLogon' and Copying files"
+		mkdir "C:\Windows\FirstUserLogon" -ErrorAction SilentlyContinue
+		Copy-Item "DebloatScript-HKCU.ps1" "C:\Windows\FirstUserLogon\DebloatScript-HKCU.ps1"
+		Copy-Item "FirstLogon.bat" "C:\Windows\FirstUserLogon\FirstLogon.bat"
+	Write-Host
 
-#	Shutdown.exe -r -t 90
+	Write-Host -ForegroundColor $NotificationColor "Enabling Registry Keys to run Logon Script"
+		REG LOAD HKEY_Users\DefaultUser "C:\Users\Default\NTUSER.DAT"
+		Set-ItemProperty -Path "REGISTRY::HKEY_USERS\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Run" -Name "FirstUserLogon" -Value "C:\Windows\FirstUserLogon\FirstLogon.bat" -Type "String"
+		REG UNLOAD HKEY_Users\DefaultUser
+	
+	Write-Host -ForegroundColor $NotificationColor "New User Logon Script Successfully Enabled"
+}
+
+	Write-Host -ForegroundColor Red "Complete. Please review errors, and it is recommended to restart the computer now"
+	
+	Shutdown.exe -r -t 90
+	Write-Host
+	Write-Host -ForegroundColor Red "System will restart in 90 seconds. To abort, send command: Shutdown.exe -a "
+
 
 
 
