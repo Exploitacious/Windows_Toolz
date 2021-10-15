@@ -11,7 +11,7 @@ $VPNPreShrKeyDST = "Pre-Shared Key"
 $VPNInternalSubnetDS = "Add a static route to the internal subnet of the network you wish to be connected to. ex. '192.168.10.0/24'"
 $VPNInternalSubnetDST = "Internal Subnet"
 
-$VPNConnectionName = [Microsoft.VisualBasic.Interaction]::InputBox($VPNConnectionNameDS, $VPNInternalSubnetDST) # Name of VPN Connection that will show in Windows ex. "ClientName-VPN"
+$VPNConnectionName = [Microsoft.VisualBasic.Interaction]::InputBox($VPNConnectionNameDS, $VPNConnectionNameDST) # Name of VPN Connection that will show in Windows ex. "ClientName-VPN"
 $VPNServerAddress = [Microsoft.VisualBasic.Interaction]::InputBox($VPNServerAddressDS, $VPNServerAddressDST) # Publically routable IP Address or Domain
 $VPNPreShrKey = [Microsoft.VisualBasic.Interaction]::InputBox($VPNPreShrKeyDS, $VPNPreShrKeyDST) # Pre-Shared Key used for authentication
 $VPNInternalSubnet = [Microsoft.VisualBasic.Interaction]::InputBox($VPNInternalSubnetDS, $VPNInternalSubnetDST) # Add a static route to the internal subnet of the network you wish to be connected to. ex. '192.168.10.0/24'
