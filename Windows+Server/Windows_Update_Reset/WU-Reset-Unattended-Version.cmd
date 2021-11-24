@@ -15,9 +15,7 @@
 
 	openfiles>nul 2>&1
 
-	if %errorlevel% EQU 0 goto WUReset
-
-	call :print Checking for Administrator elevation.
+	if %errorlevel% EQU 0 goto :WUReset
 
 	echo.
 	echo.    You are not running as Administrator.
