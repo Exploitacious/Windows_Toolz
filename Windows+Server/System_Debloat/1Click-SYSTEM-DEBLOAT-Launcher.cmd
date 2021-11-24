@@ -18,15 +18,14 @@
     exit
 
 
-
 :: Download Required Files from https://github.com/Exploitacious/Windows_Toolz/tree/main/Windows%2BServer/System_Debloat
 :Download
 
-    curl -o "SYSTEM-Debloat-MAIN.ps1" https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows%2BServer/System_Debloat/SYSTEM-Debloat-MAIN.ps1
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows%2BServer/System_Debloat/SYSTEM-Debloat-MAIN.ps1', 'SYSTEM-Debloat-MAIN.ps1')"
 
-    curl -o "DebloatScript-HKCU.ps1" https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows%2BServer/System_Debloat/DebloatScript-HKCU.ps1
-
-    curl -o "FirstLogon.bat" https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows%2BServer/System_Debloat/FirstLogon.bat
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows%2BServer/System_Debloat/DebloatScript-HKCU.ps1', 'DebloatScript-HKCU.ps1')"
+    
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows%2BServer/System_Debloat/FirstLogon.bat', 'FirstLogon.bat')"
 
 
 
