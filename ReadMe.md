@@ -6,6 +6,6 @@
 
 Popular Links:
 
--   (System Debloat) https://github.com/Exploitacious/Windows_Toolz/tree/main/Windows%2BServer/System_Debloat
--   (Windows Update Reset) https://github.com/Exploitacious/Windows_Toolz/tree/main/Windows%2BServer/Windows_Update_Reset
+-   *System Debloat One-Click Launcher* https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows%2BServer/System_Debloat/1Click-SYSTEM-DEBLOAT-Launcher.cmd
 
+-   *Windows Update Reset* https://github.com/Exploitacious/Windows_Toolz/tree/main/Windows%2BServer/Windows_Update_Reset
