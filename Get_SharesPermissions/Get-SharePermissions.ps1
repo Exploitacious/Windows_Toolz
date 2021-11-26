@@ -1,32 +1,3 @@
-<#
-           .SYNOPSIS 
-           This script will list all shares on a computer, and list all the share permissions for each share.
-
-           .DESCRIPTION
-           The script will take a list all shares on a local or remote computer.
-    
-           .PARAMETER Computer
-           Specifies the computer or array of computers to process
-
-           .INPUTS
-           Get-SharePermissions accepts pipeline of computer name(s)
-
-           .OUTPUTS
-           Produces an array object for each share found.
-
-           .EXAMPLE
-           C:\PS> .\Get-SharePermissions # Operates against local computer.
-
-           .EXAMPLE
-           C:\PS> 'computerName' | .\Get-SharePermissions
-
-           .EXAMPLE
-           C:\PS> Get-Content 'computerlist.txt' | .\Get-SharePermissions | Out-File 'SharePermissions.txt'
-
-           .EXAMPLE
-           Get-Help .\Get-SharePermissions -Full
-#>
-
 # Created by Alex Ivantsov
 # Updated 9/19/2021
 # Ver. 3.0
