@@ -6,6 +6,6 @@
 
 Popular Links:
 
--   *System Debloat One-Click Launcher* https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows%2BServer/System_Debloat/1Click-SYSTEM-DEBLOAT-Launcher.cmd
+-   *System Debloat One-Click Launcher* https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/System_Debloat/1Click-SYSTEM-DEBLOAT-Launcher.cmd
 
--   *Windows Update Reset* https://github.com/Exploitacious/Windows_Toolz/tree/main/Windows%2BServer/Windows_Update_Reset
+-   *Windows Update Reset* https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows_Update_Reset/WU-Reset-Unattended-Version.cmd
