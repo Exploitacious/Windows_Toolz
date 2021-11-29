@@ -9,6 +9,10 @@
         if %errorlevel% EQU 0 goto :Download
 
         echo.
+        echo.
+        echo.
+        echo.
+        echo.
         echo.    You are not running as Administrator.
         echo.    This script cannot do it's job without elevation.
         echo.

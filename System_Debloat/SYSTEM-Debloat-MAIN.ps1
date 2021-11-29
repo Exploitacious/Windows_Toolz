@@ -56,7 +56,10 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 
 # Set Variables and Ensure Script is running as Admin.
 
-	$EnableUserLogonScript = Read-Host "Would you like this script to configure the first-time user logon script?"
+	Write-Host
+	Write-Host
+	Write-Host
+	$EnableUserLogonScript = Read-Host "Would you like this script to configure the first-time user logon experience script Y/N ? (Recommended)"
 
 	$ErrorActionPreference = 'SilentlyContinue'
 	$NotificationColor = 'Yellow'
