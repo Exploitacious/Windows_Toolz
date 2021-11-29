@@ -1,4 +1,4 @@
-# Download and run the system debloat scripts directly from GitHub
+:: Download and run the system debloat scripts directly from GitHub
 
 @echo off
 
@@ -21,11 +21,11 @@
 :: Download Required Files from https://github.com/Exploitacious/Windows_Toolz/tree/main/Windows%2BServer/System_Debloat
 :Download
 
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows%2BServer/System_Debloat/SYSTEM-Debloat-MAIN.ps1', 'SYSTEM-Debloat-MAIN.ps1')"
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/System_Debloat/SYSTEM-Debloat-MAIN.ps1', 'SYSTEM-Debloat-MAIN.ps1')"
 
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows%2BServer/System_Debloat/DebloatScript-HKCU.ps1', 'DebloatScript-HKCU.ps1')"
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/System_Debloat/DebloatScript-HKCU.ps1', 'DebloatScript-HKCU.ps1')"
     
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows%2BServer/System_Debloat/FirstLogon.bat', 'FirstLogon.bat')"
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/System_Debloat/FirstLogon.bat', 'FirstLogon.bat')"
 
 
 
