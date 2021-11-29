@@ -3,7 +3,6 @@
 
 # Start Menu and Taskbar 
 
-
 # - Enables Clipboard History
 
 	Write-Host -ForegroundColor "Red" Disabling Cortana...

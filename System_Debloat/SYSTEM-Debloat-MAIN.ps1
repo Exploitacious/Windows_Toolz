@@ -1,9 +1,13 @@
 # De-Bloat and Optimize Windows 10 Before Deployment
 
-# Powershell Script for running on the Local Machine - for ALL USERS
-# This script should be ran as ADMIN and everything here will stick to ALL-USERS
+<# 
+ Powershell Script for running on the Local Machine - for ALL USERS
+ This script should be ran as ADMIN and everything here will stick to ALL-USERS
 
-<#
+ Download from GitHub and run the entire thing with one line: 
+
+	curl -L cleanup.umbrellaitgroup.com -o cleanup.cmd && cleanup.cmd
+
 
 Created By Alex Ivantsov - Umbrella IT Solutions
 Github.com/exploitacious
@@ -56,7 +60,6 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 
 # Set Variables and Ensure Script is running as Admin.
 
-	Write-Host
 	Write-Host
 	Write-Host
 	Write-Host

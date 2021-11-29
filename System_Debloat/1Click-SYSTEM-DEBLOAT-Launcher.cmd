@@ -1,4 +1,5 @@
 :: Download and run the system debloat scripts directly from GitHub
+:: Created by: Alex Ivantsov
 
 @echo off
 
