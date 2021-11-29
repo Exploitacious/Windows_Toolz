@@ -4,8 +4,13 @@
 
 Popular Links:
 
--   # System Debloat One-Liner
-curl -L cleanup.umbrellaitgroup.com -o cleanup.cmd && cleanup.cmd 
+# System Debloat One-Liner
 
--   # Windows Update Reset 
-https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows_Update_Reset/WU-Reset-Unattended-Version.cmd
+    curl -L cleanup.umbrellaitgroup.com -o cleanup.cmd && cleanup.cmd
+
+    https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/System_Debloat/1Click-SYSTEM-DEBLOAT-Launcher.cmd
+
+
+# Windows Update Reset 
+
+    https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows_Update_Reset/WU-Reset-Unattended-Version.cmd

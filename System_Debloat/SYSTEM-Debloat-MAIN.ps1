@@ -473,12 +473,17 @@ If ( $EnableUserLogonScript -eq "Yes" -or $EnableUserLogonScript -eq "Y") {
 	Write-Host -ForegroundColor $NotificationColor "New User Logon Script Successfully Enabled"
 }
 
+	remove-item "DebloatScript-HKCU.ps1" -Force
+	remove-item "FirstLogon.bat" -Force
+	remove-item "cleanup.cmd" -Force
+
 	Write-Host -ForegroundColor Red "Complete. Please review errors, and it is recommended to restart the computer now"
 	
 	Shutdown.exe -r -t 90
 	Write-Host
 	Write-Host -ForegroundColor Red "System will restart in 90 seconds. To abort, send command: Shutdown.exe -a "
 
+	Remove-Item -LiteralPath $MyInvocation.MyCommand.Path -Force
 
 
 
