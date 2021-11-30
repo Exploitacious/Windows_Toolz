@@ -97,6 +97,8 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 	$Bloatware = @(
 		"*Advertising*"
 		"*BingWeather*"
+		"*BingSports*"
+		"*BingTranslator*"
 		"*PPIProjection*"
 		"*BingNews*"
 		"*GetHelp*"
@@ -110,7 +112,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 		"*Lens*"                          
 		"*OneConnect*"
 		"*Sway*"
-		# "*People*"
+		"*People*"
 		"*Print3D*"
 		# "*RemoteDesktop*"                        
 		"*SkypeApp*"
@@ -154,7 +156,45 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 		"*LenovoCompanion*"
 		"*Instagram*"
 		"*WebExperience*" # This is the Windows 11 Widgets BS Microsof thas thrown in to the new OS. Remove Widgets entirely.
-		
+		"*McAfee*"
+		"*ArmouryCrate*"
+		"*ASUSPCAssistant*"
+		"*GamingServices*"
+		"*Xbox.TCUI*"
+		"*PicsArt-PhotoStudio*"
+		"*EclipseManager*"
+		"*Netflix*"
+		"*PolarrPhotoEditor*"
+		"*Wunderlist*"
+		"*LinkedInforWindows*"
+		"*AutodeskSketchBook*"
+		"*Twitter*"
+		"*DisneyMagicKingdoms*"
+		"*MarchofEmpires*"
+		"*562882FEEB491*" # Code Writer from Actipro Software LLC
+		"*Plex*"
+		"*iHeartRadio*"
+		"*FarmVille2CountryEscape*"
+		"*CyberLinkMediaSuiteEssentials*"
+		"*DolbyAccess*"
+		"*DrawboardPDF*"
+		"*FitbitCoach*"
+		"*Flipboard*"
+		"*Asphalt8Airborne*"
+		"*Keeper*"
+		"*COOKINGFEVER*"
+		"*PandoraMediaInc*"
+		"*Casino*"
+		"*Shazam*"
+		"*SlingTV*"
+		"*SpotifyMusic*"
+		"*TheNewYorkTimes*"
+		"*PhototasticCollage*"
+		"*TuneIn*"
+		"*WinZipComputing*"
+		"*XINGAG*"
+		"*flaregames*"
+		"*king.com*"
 	)
 
 	# This writes the output of each Bloatware Appx as it's removing.
@@ -285,6 +325,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 	Write-Host -ForegroundColor $NotificationColor Disabling Application suggestions...
 
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "ContentDeliveryAllowed" -Type DWord -Value 0
+		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "FeatureManagementEnabled" -Type DWord -Value 0
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "OemPreInstalledAppsEnabled" -Type DWord -Value 0
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "PreInstalledAppsEnabled" -Type DWord -Value 0
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "PreInstalledAppsEverEnabled" -Type DWord -Value 0
@@ -298,6 +339,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SubscribedContent-353694Enabled" -Type DWord -Value 0
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SubscribedContent-353696Enabled" -Type DWord -Value 0
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SubscribedContent-353698Enabled" -Type DWord -Value 0
+		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SubscribedContentEnabled" -Type DWord -Value 0
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SystemPaneSuggestionsEnabled" -Type DWord -Value 0
 		If (!(Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement")) {
 			New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement" -Force | Out-Null

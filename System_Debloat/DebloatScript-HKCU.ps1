@@ -22,7 +22,8 @@
 	Write-Host -ForegroundColor "Red" Disabling Bing Search in Start Menu...
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "BingSearchEnabled" -Type DWord -Value 0
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "CortanaConsent" -Type DWord -Value 0
-
+		Set-WindowsSearchSetting -EnableWebResultsSetting $false
+		
 
 	Write-Host -ForegroundColor "Red" Disabling Application suggestions...
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "ContentDeliveryAllowed" -Type DWord -Value 0
