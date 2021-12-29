@@ -8,9 +8,10 @@ Popular Links:
 
     curl -L cleanup.umbrellaitgroup.com -o cleanup.cmd && cleanup.cmd
 
-    https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/System_Debloat/1Click-SYSTEM-DEBLOAT-Launcher.cmd
-
-
 # Windows Update Reset 
 
-    https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows_Update_Reset/WU-Reset-Unattended-Version.cmd
+    curl -L wureset.umbrellaitgroup.com -o WUReset-Unattented.cmd && WUReset-Unattented.cmd
+
+# Gather Windoes Logs and Generate a CSV Timeline
+
+    curl -L gatherlogs.umbrellaitgroup.com -o Gather-Logs.cmd && Gather-Logs.cmd
