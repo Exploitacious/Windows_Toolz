@@ -199,18 +199,15 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 
 	# This writes the output of each Bloatware Appx as it's removing.
 
-	Start-Job -Name RemoveBloat -ScriptBlock {
-			foreach ($App in $Bloatware) {
-				Write-host ('Removing Package {0}' -f $App)
-					
-				Get-AppxPackage -Name $App | Remove-AppxPackage -ErrorAction SilentlyContinue -Verbose
-				Get-AppxPackage -Name $App -AllUsers | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue -Verbose
-				Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like $App | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue -Verbose
+		foreach ($App in $Bloatware) {
+			Write-host ('Removing Package {0}' -f $App)
+				
+			Get-AppxPackage -Name $App | Remove-AppxPackage -ErrorAction SilentlyContinue -Verbose
+			Get-AppxPackage -Name $App -AllUsers | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue -Verbose
+			Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like $App | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue -Verbose
 
-				Receive-Job -Name RemoveBloat
-				Wait-Job -Name RemoveBloat
-		}
 	}
+
 
 
 
