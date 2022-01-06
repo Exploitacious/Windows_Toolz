@@ -515,6 +515,8 @@ If ( $EnableUserLogonScript -eq "Yes" -or $EnableUserLogonScript -eq "Y") {
 	Write-Host -ForegroundColor $NotificationColor "New User Logon Script Successfully Enabled"
 }
 
+	wait-job -Any
+
 	remove-item "DebloatScript-HKCU.ps1" -Force
 	remove-item "FirstLogon.bat" -Force
 	remove-item "cleanup.cmd" -Force

@@ -26,6 +26,10 @@
 :: Download Required Files from https://github.com/Exploitacious/Windows_Toolz/tree/main/Windows%2BServer/System_Debloat
 :Download
 
+    PowerShell -Command "mkdir C:\Temp\Cleanup -erroraction silentlycontinue"
+    
+    cd "C:\Temp\Cleanup"
+
     PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/System_Debloat/SYSTEM-Debloat-MAIN.ps1', 'SYSTEM-Debloat-MAIN.ps1')"
 
     PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/System_Debloat/DebloatScript-HKCU.ps1', 'DebloatScript-HKCU.ps1')"
@@ -37,6 +41,6 @@
 :: Start Running the SYSTEM DEBLOAT scripts
 :RunScript
 
-    SET ThisScriptsDirectory=%~dp0
+    SET ThisScriptsDirectory=C:\Temp\Cleanup\
     SET PowerShellScriptPath=%ThisScriptsDirectory%SYSTEM-Debloat-MAIN.ps1
     PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '%PowerShellScriptPath%'";
