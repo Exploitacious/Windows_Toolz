@@ -199,7 +199,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 
 	# This writes the output of each Bloatware Appx as it's removing.
 
-	Start-Job -ScriptBlock {
+	Start-Job -Name RemoveBloat -ScriptBlock {
 			foreach ($App in $Bloatware) {
 				Write-host ('Removing Package {0}' -f $App)
 					
@@ -208,9 +208,9 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 				Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like $App | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue -Verbose
 		}
 	}
-	
-	Receive-Job -Id 1
-	Wait-Job -Id 1
+
+	Receive-Job -Name RemoveBloat
+	Wait-Job -Name RemoveBloat
 
 
 # Registry Tweaks
