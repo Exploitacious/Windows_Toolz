@@ -114,9 +114,9 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 		"*Sway*"
 		"*People*"
 		"*Print3D*"
-		# "*RemoteDesktop*"                        
+		"*RemoteDesktop*"                        
 		"*SkypeApp*"
-		# "*Whiteboard*"
+		"*Whiteboard*"
 		"*ScreenSketch*"                           
 		"*WindowsAlarms*"
 		"*windowscommunicationsapps*"
@@ -199,7 +199,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 
 	# This writes the output of each Bloatware Appx as it's removing.
 
-		$RemoveBloat = Start-Job {
+	Start-Job -ScriptBlock {
 			foreach ($App in $Bloatware) {
 				Write-host ('Removing Package {0}' -f $App)
 					
@@ -209,7 +209,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 		}
 	}
 
-	Wait-Job $RemoveBloat
+	Wait-Job -Any
 
 
 # Registry Tweaks
@@ -519,8 +519,6 @@ If ( $EnableUserLogonScript -eq "Yes" -or $EnableUserLogonScript -eq "Y") {
 	
 	Write-Host -ForegroundColor $NotificationColor "New User Logon Script Successfully Enabled"
 }
-
-	wait-job -Any
 
 	remove-item "DebloatScript-HKCU.ps1" -Force
 	remove-item "FirstLogon.bat" -Force
