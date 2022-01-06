@@ -208,10 +208,10 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 				Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like $App | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue -Verbose
 
 				Receive-Job -Name RemoveBloat
+				Wait-Job -Name RemoveBloat
 		}
 	}
 
-	Wait-Job -Name RemoveBloat
 
 
 
