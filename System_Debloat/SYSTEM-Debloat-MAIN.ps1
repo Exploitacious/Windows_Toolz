@@ -208,8 +208,9 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 				Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like $App | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue -Verbose
 		}
 	}
-
-	Wait-Job -Any
+	
+	Receive-Job -Id 1
+	Wait-Job -Id 1
 
 
 # Registry Tweaks
