@@ -20,10 +20,10 @@
     exit
 
 
-:: Download Required Files from https://github.com/Exploitacious/Windows_Toolz/tree/main/Windows%2BServer/System_Debloat
+:: Download Required Files from https://github.com/Exploitacious/Windows_Toolz/blob/main/Windows_Update_Reset/WUReset-Unattended.cmd
 :Download
 
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows_Update_Reset/WU-Reset-Unattended-Version.cmd', 'WU-Reset-Unattended-Version.cmd')"
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Windows_Update_Reset/WUReset-Unattended.cmd', 'WU-Reset-Unattended-Version.cmd')"
 
 
 :: Start Running the SYSTEM DEBLOAT scripts
