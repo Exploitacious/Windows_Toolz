@@ -191,6 +191,129 @@ exit
 	regsvr32.exe /s muweb.dll
 	regsvr32.exe /s wuwebv.dll
 
+	:: ----- Removing WSUS Client Settings -----
+
+TRANSLATE FROM POWERSHELL
+https://gist.github.com/desbest/1a15622ae7d0421a735c6e78493510b3
+
+	Write-Host "7) Removing WSUS client settings..." 
+
+	Remove more registry keys
+
+	HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate
+		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /v AccountDomainSid /f 
+		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /v PingID /f 
+		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /v SusClientId /f 
+
+		HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update /V AUOptions -0
+
+
+	HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update
+
+		Remove-Item HKLM: \Software\Policies\Microsoft\Windows\WindowsUpdate -Recurse
+
+		REG.exe DELETE HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate /V WUServer  /F
+
+		REG.exe DELETE HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate /V WUStatusServer  /F
+
+		REG.exe DELETE HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate /V TargetGroup /F
+
+		REG.exe DELETE HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate /V TargetGroupEnabled /F
+
+		REG.exe DELETE HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU /V NoAutoUpdate  /F
+
+		REG.exe DELETE HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU /V UseWUServer  /F
+
+
+	NAble Windows Update Mods
+		https://success.n-able.com/kb/solarwinds_n-central/Registry-Keys-modified-when-Patch-Management-is-enabled-or-disabled
+
+		Set Defaults from Microsoft https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-R2-and-2008/dd939844(v=ws.10)?redirectedfrom=MSDN#registry-keys-for-configuring-automatic-updates
+
+			HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer
+
+				NoWindowsUpdate	Reg_DWORD 0
+
+			HKEY_LOCAL_MACHINE\SYSTEM\Internet Communication Management\Internet Communication
+
+				DisableWindowsUpdateAccess	Reg_DWORD 0
+
+			HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate
+
+				DisableWindowsUpdateAccess	Reg_DWORD 0
+
+			HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate
+
+				AcceptTrustedPublisherCerts	Reg_DWORD	1
+				DisableWindowsUpdateAccess	Reg_DWORD	0
+				ElevateNonAdmins	Reg_DWORD			1
+				TargetGroup	Reg_SZ				TargetGroupEnabled 	Delete?
+				TargetGroupEnabled	Reg_DWORD			0
+				TargetGroupEnabled	Reg_DWORD			DELETE
+				WUStatusServer	Reg_SZ					DELETE
+
+			HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate\AU
+
+				AUOptions	Reg_DWORD	Range = 2|3|4|5
+					- 2 = Notify before download.
+					- 3 = Automatically download and notify of installation.
+					- 4 = Automatically download and schedule installation. Only valid if values exist for ScheduledInstallDay and ScheduledInstallTime.
+					- 5 = Automatic Updates is required and users can configure it.
+					
+					AutoInstallMinorUpdates	Reg_DWORD	Range = 0|1
+					- 0 = Treat minor updates like other updates.
+					- 1 = Silently install minor updates.
+					
+					DetectionFrequency	Reg_DWORD	Range = n, where n = time in hours (1–22).
+					- Time between detection cycles.
+					
+					DetectionFrequencyEnabled	Reg_DWORD	Range = 0|1
+					- 1 = Enable detection frequency.
+					- 0 = Disable custom detection frequency (use default value of 22 hours).
+					
+					NoAutoRebootWithLoggedOnUsers	Reg_DWORD	Range = 0|1
+					- 1 = Logged-on user can decide whether to restart the client computer.
+					- 0 = Automatic Updates notifies the user that the computer will restart in 15 minutes.
+					
+					NoAutoUpdate	Reg_DWORD	Range = 0|1
+					- 0 = Enable Automatic Updates.
+					- 1 = Disable Automatic Updates.
+					
+					RebootRelaunchTimeout	Reg_DWORD	Range = n, where n = time in minutes (1–1,440).
+					- Time between prompts for a scheduled restart.
+					
+					RebootRelaunchTimeoutEnabled	Reg_DWORD	Range = 0|1
+					- 1 = Enable RebootRelaunchTimeout.
+					- 0 = Disable custom RebootRelaunchTimeout(use default value of 10 minutes).
+					
+					RebootWarningTimeout	Reg_DWORD	Range = n, where n = time in minutes (1–30).
+					- Length, in minutes, of the restart warning countdown after updates have been installed that have a deadline or scheduled updates.
+					
+					RebootWarningTimeoutEnabled	Reg_DWORD	Range = 0|1
+					- 1 = Enable RebootWarningTimeout.
+					- 0 = Disable custom RebootWarningTimeout (use default value of 5 minutes).
+					
+					RescheduleWaitTime	Reg_DWORD	Range = n, where n = time in minutes (1–60).
+					- Time in minutes that Automatic Updates waits at startup before it applies updates from a missed scheduled installation time.
+					- This policy applies only to scheduled installations, not to deadlines. Updates with deadlines that have expired should always be installed as soon as possible.
+					
+					RescheduleWaitTimeEnabled	Reg_DWORD	Range = 0|1
+					- 1 = Enable RescheduleWaitTime .
+					- 0 = Disable RescheduleWaitTime (attempt the missed installation during the next scheduled installation time).
+					
+					ScheduledInstallDay	Reg_DWORD	Range = 0|1|2|3|4|5|6|7
+					- 0 = Every day.
+					- 1 through 7 = the days of the week from Sunday (1) to Saturday (7).
+					(Only valid if AUOptions = 4.)
+					
+					ScheduledInstallTime	Reg_DWORD	Range = n, where n = the time of day in 24-hour format (0–23).
+					
+					UseWUServer	Reg_DWORD	Range = 0|1
+					- 1 = The computer gets its updates from a WSUS server.
+					- 0 = The computer gets its updates from Microsoft Update.
+					- The WUServer value is not respected unless this key is set.
+
+
 	:: ----- Resetting Winsock -----
 	echo Resetting Winsock.
 	netsh winsock reset
