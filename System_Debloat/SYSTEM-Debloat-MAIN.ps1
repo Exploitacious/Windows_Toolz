@@ -63,7 +63,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 	Write-Host
 	Write-Host
 	Write-Host
-	$EnableUserLogonScript = Read-Host "Would you like this script to configure the first-time user logon experience script Y/N ? (Recommended)"
+	$EnableUserLogonScript = $true
 
 	$ErrorActionPreference = 'SilentlyContinue'
 	$NotificationColor = 'Yellow'
@@ -197,19 +197,19 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 		"*king.com*"
 	)
 
-	# Starts the Debloat as a background Process. Outputs results at the end?
+	# Starts the Debloat as a background Process.
 
 		foreach ($App in $Bloatware) {
 			Write-host ('Removing Package {0}' -f $App)
-				
-			Get-AppxPackage -Name $App | Remove-AppxPackage -ErrorAction SilentlyContinue -Verbose
-			Get-AppxPackage -Name $App -AllUsers | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue -Verbose
-			Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like $App | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue -Verbose
+			
+				Start-Job -Name $App -ScriptBlock {		
+					Get-AppxPackage -Name $App | Remove-AppxPackage -ErrorAction SilentlyContinue -Verbose
+					Get-AppxPackage -Name $App -AllUsers | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue -Verbose
+					Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like $App | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue -Verbose
+				}
 
-	}
-
-
-
+					Wait-Job -Name $App 
+		}
 
 
 
@@ -506,7 +506,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 
 # Implement User Logon Script
 
-If ( $EnableUserLogonScript -eq "Yes" -or $EnableUserLogonScript -eq "Y") { 
+If ( $EnableUserLogonScript -eq $true) { 
 	Write-Host -ForegroundColor $NotificationColor "Creating Directories 'C:\Windows\FirstUserLogon' and Copying files"
 		mkdir "C:\Windows\FirstUserLogon" -ErrorAction SilentlyContinue
 		Copy-Item "DebloatScript-HKCU.ps1" "C:\Windows\FirstUserLogon\DebloatScript-HKCU.ps1"
