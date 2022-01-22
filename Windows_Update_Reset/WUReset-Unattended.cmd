@@ -53,34 +53,40 @@ exit
 
 
 	:: ----- Checking the services status -----
-	echo Checking the services status.
+	echo.
+	echo.
+	echo.
+	echo Checking the bits services status.
 
 	sc query bits | findstr /I /C:"STOPPED"
 	if %errorlevel% NEQ 0 (
-		echo.    Failed to stop the BITS service.
+		echo.    Failed to stop the BITS service. Restart/Kill BITS and try again.
 		echo.
 		goto :eof
 	)
 
-	echo Checking the services status.
+	echo.
+	echo Checking the wuauserv services status.
 
 	sc query wuauserv | findstr /I /C:"STOPPED"
 	if %errorlevel% NEQ 0 (
-		echo.    Failed to stop the Windows Update service.
+		echo.    Failed to stop the Windows Update service. Restart/Kill WU and try again.
 		echo.
 		goto :eof
 	)
 
+	echo.
 	echo Checking the services status.
 
 	sc query appidsvc | findstr /I /C:"STOPPED"
 	if %errorlevel% NEQ 0 (
-		sc query appidsvc | findstr /I /C:"OpenService FAILED 1060"
+		sc query appidsvc | findstr /I /C:"FAILED 1060"
 		if %errorlevel% NEQ 0 (
 			echo.    Failed to stop the Application Identity service.
 		)
 	)
 
+	echo.
 	echo Checking the services status.
 
 	sc query cryptsvc | findstr /I /C:"STOPPED"
@@ -89,13 +95,21 @@ exit
 	)
 
 	:: ----- Delete the qmgr*.dat files -----
+	echo.
+	echo.
+	echo.
 	echo Deleting the qmgr*.dat files.
 
+	del /s /q /f "C:\ProgramData\Application Data\Microsoft\Network\Downloader\qmgr*.dat"
+	del /s /q /f "C:\ProgramData\Microsoft\Network\Downloader\qmgr*.dat"
 	del /s /q /f "%ALLUSERSPROFILE%\Application Data\Microsoft\Network\Downloader\qmgr*.dat"
 	del /s /q /f "%ALLUSERSPROFILE%\Microsoft\Network\Downloader\qmgr*.dat"
 
 
 	:: ----- Renaming the softare distribution folders backup copies -----
+	echo.
+	echo.
+	echo.
 	echo Deleting the old software distribution backup copies.
 
 	cd /d %SYSTEMROOT%
@@ -112,17 +126,33 @@ exit
 	if exist "%SYSTEMROOT%\WindowsUpdate.log.bak" (
 		del /s /q /f "%SYSTEMROOT%\WindowsUpdate.log.bak"
 	)
+		if exist "%SYSTEMROOT%\winsxs\pending.xml.old" (
+		del /s /q /f "%SYSTEMROOT%\winsxs\pending.xml.old"
+	)
+	if exist "%SYSTEMROOT%\SoftwareDistribution.old" (
+		rmdir /s /q "%SYSTEMROOT%\SoftwareDistribution.old"
+	)
+	if exist "%SYSTEMROOT%\system32\Catroot2.old" (
+		rmdir /s /q "%SYSTEMROOT%\system32\Catroot2.old"
+	)
+	if exist "%SYSTEMROOT%\WindowsUpdate.log.old" (
+		del /s /q /f "%SYSTEMROOT%\WindowsUpdate.log.old"
+	)
 
-	echo Renaming the software distribution folders.
+
+	echo.
+	echo.
+	echo.
+	echo Renaming the software distribution folders - SYSTEMROOT\winsxs\pending.xml, SoftwareDistribution, Catroot2, WindowsUpdate.log 
 
 	if exist "%SYSTEMROOT%\winsxs\pending.xml" (
 		takeown /f "%SYSTEMROOT%\winsxs\pending.xml"
 		attrib -r -s -h /s /d "%SYSTEMROOT%\winsxs\pending.xml"
-		ren "%SYSTEMROOT%\winsxs\pending.xml" pending.xml.old
+		ren "%SYSTEMROOT%\winsxs\pending.xml" pending.xml.bak
 	)
 	if exist "%SYSTEMROOT%\SoftwareDistribution" (
 		attrib -r -s -h /s /d "%SYSTEMROOT%\SoftwareDistribution"
-		ren "%SYSTEMROOT%\SoftwareDistribution" SoftwareDistribution.old
+		ren "%SYSTEMROOT%\SoftwareDistribution" SoftwareDistribution.bak
 		if exist "%SYSTEMROOT%\SoftwareDistribution" (
 			echo.
 			echo.    Failed to rename the SoftwareDistribution folder.
@@ -131,15 +161,18 @@ exit
 	)
 	if exist "%SYSTEMROOT%\system32\Catroot2" (
 		attrib -r -s -h /s /d "%SYSTEMROOT%\system32\Catroot2"
-		ren "%SYSTEMROOT%\system32\Catroot2" Catroot2.old
+		ren "%SYSTEMROOT%\system32\Catroot2" Catroot2.bak
 	)
 	if exist "%SYSTEMROOT%\WindowsUpdate.log" (
 		attrib -r -s -h /s /d "%SYSTEMROOT%\WindowsUpdate.log"
-		ren "%SYSTEMROOT%\WindowsUpdate.log" WindowsUpdate.log.old
+		ren "%SYSTEMROOT%\WindowsUpdate.log" WindowsUpdate.log.bak
 	)
 
 
 	:: ----- Reset the BITS service and the Windows Update service to the default security descriptor -----
+	echo.
+	echo.
+	echo.
 	echo Reset the BITS service and the Windows Update service to the default security descriptor.
 
 	sc.exe sdset wuauserv D:(A;CI;CCLCSWRPLORC;;;AU)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;SY)S:(AU;FA;CCDCLCSWRPWPDTLOSDRCWDWO;;;WD)
@@ -198,7 +231,10 @@ exit
 ::	https://success.n-able.com/kb/solarwinds_n-central/Registry-Keys-modified-when-Patch-Management-is-enabled-or-disabled
 
 
-	echo 7) Resolving WSUS Client Settings and deleting registry keys ...
+	echo.
+	echo.
+	echo.
+	echo 7) Resolving WSUS Client Settings and deleting bogus registry keys ... (ignore any missing keys)
 
 		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /V AccountDomainSid /F
 		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /V PingID /F
@@ -239,7 +275,7 @@ exit
 
 ::		Set Defaults from Microsoft https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-R2-and-2008/dd939844(v=ws.10)?redirectedfrom=MSDN#registry-keys-for-configuring-automatic-updates
 
-	echo Setting Defaults from Microsoft...
+	echo Setting Default Registry Keys from Microsoft...
 
 			REG ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoWindowsUpdate /t Reg_DWORD /d 0
 			REG ADD "HKLM\SYSTEM\Internet Communication Management\Internet Communication" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0
@@ -268,16 +304,25 @@ exit
 
 
 	:: ----- Resetting Winsock -----
+	
+	echo.
+	echo.
+	echo.
 	echo Resetting Winsock.
 	netsh winsock reset
 
 	:: ----- Resetting WinHTTP Proxy -----
+	
+	echo.
 	echo Resetting WinHTTP Proxy.
 
 	netsh winhttp reset proxy
 
 
 	:: ----- Set the startup type as automatic -----
+	echo.
+	echo.
+	echo.
 	echo Resetting the services as automatics.
 	sc.exe config wuauserv start= auto
 	sc.exe config bits start= delayed-auto
@@ -302,7 +347,7 @@ exit
 	net start DcomLaunch
 
 	:: ----- End process -----
-	echo The operation completed successfully.
+	echo The operation completed successfully if you are seeing this message. Review any errors in script output.
 
 :: /*************************************************************************************/
 
