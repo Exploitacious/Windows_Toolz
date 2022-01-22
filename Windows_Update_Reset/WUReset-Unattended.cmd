@@ -59,8 +59,6 @@ exit
 	if %errorlevel% NEQ 0 (
 		echo.    Failed to stop the BITS service.
 		echo.
-		echo.Press any key to continue . . .
-		pause>nul
 		goto :eof
 	)
 
@@ -70,8 +68,6 @@ exit
 	if %errorlevel% NEQ 0 (
 		echo.    Failed to stop the Windows Update service.
 		echo.
-		echo.Press any key to continue . . .
-		pause>nul
 		goto :eof
 	)
 
@@ -122,11 +118,11 @@ exit
 	if exist "%SYSTEMROOT%\winsxs\pending.xml" (
 		takeown /f "%SYSTEMROOT%\winsxs\pending.xml"
 		attrib -r -s -h /s /d "%SYSTEMROOT%\winsxs\pending.xml"
-		ren "%SYSTEMROOT%\winsxs\pending.xml" pending.xml.bak
+		ren "%SYSTEMROOT%\winsxs\pending.xml" pending.xml.old
 	)
 	if exist "%SYSTEMROOT%\SoftwareDistribution" (
 		attrib -r -s -h /s /d "%SYSTEMROOT%\SoftwareDistribution"
-		ren "%SYSTEMROOT%\SoftwareDistribution" SoftwareDistribution.bak
+		ren "%SYSTEMROOT%\SoftwareDistribution" SoftwareDistribution.old
 		if exist "%SYSTEMROOT%\SoftwareDistribution" (
 			echo.
 			echo.    Failed to rename the SoftwareDistribution folder.
@@ -135,12 +131,13 @@ exit
 	)
 	if exist "%SYSTEMROOT%\system32\Catroot2" (
 		attrib -r -s -h /s /d "%SYSTEMROOT%\system32\Catroot2"
-		ren "%SYSTEMROOT%\system32\Catroot2" Catroot2.bak
+		ren "%SYSTEMROOT%\system32\Catroot2" Catroot2.old
 	)
 	if exist "%SYSTEMROOT%\WindowsUpdate.log" (
 		attrib -r -s -h /s /d "%SYSTEMROOT%\WindowsUpdate.log"
-		ren "%SYSTEMROOT%\WindowsUpdate.log" WindowsUpdate.log.bak
+		ren "%SYSTEMROOT%\WindowsUpdate.log" WindowsUpdate.log.old
 	)
+
 
 	:: ----- Reset the BITS service and the Windows Update service to the default security descriptor -----
 	echo Reset the BITS service and the Windows Update service to the default security descriptor.
@@ -191,127 +188,83 @@ exit
 	regsvr32.exe /s muweb.dll
 	regsvr32.exe /s wuwebv.dll
 
-	:: ----- Removing WSUS Client Settings -----
 
-TRANSLATE FROM POWERSHELL
-https://gist.github.com/desbest/1a15622ae7d0421a735c6e78493510b3
+	:: ----- Resolving WSUS Client Settings -----
 
-	Write-Host "7) Removing WSUS client settings..." 
+:: TRANSLATE FROM POWERSHELL
+:: https://gist.github.com/desbest/1a15622ae7d0421a735c6e78493510b3
 
-	Remove more registry keys
-
-	HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate
-		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /v AccountDomainSid /f 
-		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /v PingID /f 
-		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /v SusClientId /f 
-
-		HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update /V AUOptions -0
+:: 	NAble Windows Update Mods
+::	https://success.n-able.com/kb/solarwinds_n-central/Registry-Keys-modified-when-Patch-Management-is-enabled-or-disabled
 
 
-	HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update
+	echo 7) Resolving WSUS Client Settings and deleting registry keys ...
 
-		Remove-Item HKLM: \Software\Policies\Microsoft\Windows\WindowsUpdate -Recurse
+		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /V AccountDomainSid /F
+		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /V PingID /F
+		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /V SusClientId /F
 
-		REG.exe DELETE HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate /V WUServer  /F
+		REG DELETE "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoWindowsUpdate /F 
+		REG DELETE "HKLM\SYSTEM\Internet Communication Management\Internet Communication" /v DisableWindowsUpdateAccess /F 
+		REG DELETE "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate" /v DisableWindowsUpdateAccess /F
 
-		REG.exe DELETE HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate /V WUStatusServer  /F
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v AcceptTrustedPublisherCerts /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v DisableWindowsUpdateAccess /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v ElevateNonAdmins /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v TargetGroupEnabled /F
+		REG DELETE "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /V WUServer  /F
+		REG DELETE "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /V WUStatusServer  /F
+		REG DELETE "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /V TargetGroup /F
+		REG DELETE "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /V TargetGroupEnabled /F
 
-		REG.exe DELETE HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate /V TargetGroup /F
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AUOptions /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AutoInstallMinorUpdates /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v DetectionFrequency /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v DetectionFrequencyEnabled /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoRebootWithLoggedOnUsers /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoUpdate /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootRelaunchTimeout /F
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootRelaunchTimeoutEnabled /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootWarningTimeout /F
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootWarningTimeoutEnabled /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RescheduleWaitTime /F
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RescheduleWaitTimeEnabled /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallDay /F 
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallTime /F
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v UseWUServer /F 
 
-		REG.exe DELETE HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate /V TargetGroupEnabled /F
 
-		REG.exe DELETE HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU /V NoAutoUpdate  /F
-
-		REG.exe DELETE HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU /V UseWUServer  /F
+	::	Remove-Item HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate -Recurse
 
 
-	NAble Windows Update Mods
-		https://success.n-able.com/kb/solarwinds_n-central/Registry-Keys-modified-when-Patch-Management-is-enabled-or-disabled
+::		Set Defaults from Microsoft https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-R2-and-2008/dd939844(v=ws.10)?redirectedfrom=MSDN#registry-keys-for-configuring-automatic-updates
 
-		Set Defaults from Microsoft https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-R2-and-2008/dd939844(v=ws.10)?redirectedfrom=MSDN#registry-keys-for-configuring-automatic-updates
+	echo Setting Defaults from Microsoft...
 
-			HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer
+			REG ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoWindowsUpdate /t Reg_DWORD /d 0
+			REG ADD "HKLM\SYSTEM\Internet Communication Management\Internet Communication" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0
+			REG ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0
 
-				NoWindowsUpdate	Reg_DWORD 0
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v AcceptTrustedPublisherCerts /t Reg_DWORD /d 1
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v ElevateNonAdmins /t Reg_DWORD /d 1
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v TargetGroupEnabled /t Reg_DWORD /d 0
 
-			HKEY_LOCAL_MACHINE\SYSTEM\Internet Communication Management\Internet Communication
-
-				DisableWindowsUpdateAccess	Reg_DWORD 0
-
-			HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate
-
-				DisableWindowsUpdateAccess	Reg_DWORD 0
-
-			HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate
-
-				AcceptTrustedPublisherCerts	Reg_DWORD	1
-				DisableWindowsUpdateAccess	Reg_DWORD	0
-				ElevateNonAdmins	Reg_DWORD			1
-				TargetGroup	Reg_SZ				TargetGroupEnabled 	Delete?
-				TargetGroupEnabled	Reg_DWORD			0
-				TargetGroupEnabled	Reg_DWORD			DELETE
-				WUStatusServer	Reg_SZ					DELETE
-
-			HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate\AU
-
-				AUOptions	Reg_DWORD	Range = 2|3|4|5
-					- 2 = Notify before download.
-					- 3 = Automatically download and notify of installation.
-					- 4 = Automatically download and schedule installation. Only valid if values exist for ScheduledInstallDay and ScheduledInstallTime.
-					- 5 = Automatic Updates is required and users can configure it.
-					
-					AutoInstallMinorUpdates	Reg_DWORD	Range = 0|1
-					- 0 = Treat minor updates like other updates.
-					- 1 = Silently install minor updates.
-					
-					DetectionFrequency	Reg_DWORD	Range = n, where n = time in hours (1–22).
-					- Time between detection cycles.
-					
-					DetectionFrequencyEnabled	Reg_DWORD	Range = 0|1
-					- 1 = Enable detection frequency.
-					- 0 = Disable custom detection frequency (use default value of 22 hours).
-					
-					NoAutoRebootWithLoggedOnUsers	Reg_DWORD	Range = 0|1
-					- 1 = Logged-on user can decide whether to restart the client computer.
-					- 0 = Automatic Updates notifies the user that the computer will restart in 15 minutes.
-					
-					NoAutoUpdate	Reg_DWORD	Range = 0|1
-					- 0 = Enable Automatic Updates.
-					- 1 = Disable Automatic Updates.
-					
-					RebootRelaunchTimeout	Reg_DWORD	Range = n, where n = time in minutes (1–1,440).
-					- Time between prompts for a scheduled restart.
-					
-					RebootRelaunchTimeoutEnabled	Reg_DWORD	Range = 0|1
-					- 1 = Enable RebootRelaunchTimeout.
-					- 0 = Disable custom RebootRelaunchTimeout(use default value of 10 minutes).
-					
-					RebootWarningTimeout	Reg_DWORD	Range = n, where n = time in minutes (1–30).
-					- Length, in minutes, of the restart warning countdown after updates have been installed that have a deadline or scheduled updates.
-					
-					RebootWarningTimeoutEnabled	Reg_DWORD	Range = 0|1
-					- 1 = Enable RebootWarningTimeout.
-					- 0 = Disable custom RebootWarningTimeout (use default value of 5 minutes).
-					
-					RescheduleWaitTime	Reg_DWORD	Range = n, where n = time in minutes (1–60).
-					- Time in minutes that Automatic Updates waits at startup before it applies updates from a missed scheduled installation time.
-					- This policy applies only to scheduled installations, not to deadlines. Updates with deadlines that have expired should always be installed as soon as possible.
-					
-					RescheduleWaitTimeEnabled	Reg_DWORD	Range = 0|1
-					- 1 = Enable RescheduleWaitTime .
-					- 0 = Disable RescheduleWaitTime (attempt the missed installation during the next scheduled installation time).
-					
-					ScheduledInstallDay	Reg_DWORD	Range = 0|1|2|3|4|5|6|7
-					- 0 = Every day.
-					- 1 through 7 = the days of the week from Sunday (1) to Saturday (7).
-					(Only valid if AUOptions = 4.)
-					
-					ScheduledInstallTime	Reg_DWORD	Range = n, where n = the time of day in 24-hour format (0–23).
-					
-					UseWUServer	Reg_DWORD	Range = 0|1
-					- 1 = The computer gets its updates from a WSUS server.
-					- 0 = The computer gets its updates from Microsoft Update.
-					- The WUServer value is not respected unless this key is set.
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AUOptions /t Reg_DWORD /d 3
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AutoInstallMinorUpdates /t Reg_DWORD /d 1
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v DetectionFrequency /t Reg_DWORD /d 6
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v DetectionFrequencyEnabled /t Reg_DWORD /d 1
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoRebootWithLoggedOnUsers /t Reg_DWORD /d 1
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoUpdate /t Reg_DWORD /d 0
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootRelaunchTimeout /t Reg_DWORD /d 270
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootRelaunchTimeoutEnabled /t Reg_DWORD /d 1
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootWarningTimeout /t Reg_DWORD /d 30
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootWarningTimeoutEnabled /t Reg_DWORD /d 1
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RescheduleWaitTime /t Reg_DWORD /d 15
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RescheduleWaitTimeEnabled /t Reg_DWORD /d 1
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallDay /t Reg_DWORD /d 0
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallTime /t Reg_DWORD /d 20
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v UseWUServer /t Reg_DWORD /d 0
 
 
 	:: ----- Resetting Winsock -----
