@@ -236,41 +236,11 @@ exit
 	echo.
 	echo 7) Resolving WSUS Client Settings and deleting bogus registry keys ... (ignore any missing keys)
 
-		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /V AccountDomainSid /F
-		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /V PingID /F
-		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /V SusClientId /F
+		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /F
+		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /F
 
 		REG DELETE "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoWindowsUpdate /F 
 		REG DELETE "HKLM\SYSTEM\Internet Communication Management\Internet Communication" /v DisableWindowsUpdateAccess /F 
-		REG DELETE "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate" /v DisableWindowsUpdateAccess /F
-
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v AcceptTrustedPublisherCerts /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v DisableWindowsUpdateAccess /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v ElevateNonAdmins /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v TargetGroupEnabled /F
-		REG DELETE "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /V WUServer  /F
-		REG DELETE "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /V WUStatusServer  /F
-		REG DELETE "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /V TargetGroup /F
-		REG DELETE "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /V TargetGroupEnabled /F
-
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AUOptions /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AutoInstallMinorUpdates /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v DetectionFrequency /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v DetectionFrequencyEnabled /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoRebootWithLoggedOnUsers /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoUpdate /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootRelaunchTimeout /F
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootRelaunchTimeoutEnabled /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootWarningTimeout /F
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootWarningTimeoutEnabled /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RescheduleWaitTime /F
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RescheduleWaitTimeEnabled /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallDay /F 
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallTime /F
-		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v UseWUServer /F 
-
-
-	::	Remove-Item HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate -Recurse
 
 
 ::		Set Defaults from Microsoft https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-R2-and-2008/dd939844(v=ws.10)?redirectedfrom=MSDN#registry-keys-for-configuring-automatic-updates
@@ -301,6 +271,7 @@ exit
 			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallDay /t Reg_DWORD /d 0
 			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallTime /t Reg_DWORD /d 20
 			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v UseWUServer /t Reg_DWORD /d 0
+		:: Not Needed?	REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Orchestrator\InstallAtShutdown" /t Reg_DWORD /d 1
 
 
 	:: ----- Resetting Winsock -----
