@@ -49,7 +49,7 @@ exit
 	echo.
 	echo.
 
-	sleep 5
+	timeout 5
 
 	echo Stopping the Windows Update services.
 	net stop bits /y
@@ -270,38 +270,38 @@ exit
 
 	echo Setting Default Registry Keys from Microsoft...
 
-			REG ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoWindowsUpdate /t Reg_DWORD /d 0
-			REG ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0
+			REG ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoWindowsUpdate /t Reg_DWORD /d 0 /f
+			REG ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0 /f
 
-			REG ADD "HKLM\SYSTEM\Internet Communication Management\Internet Communication" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0
+			REG ADD "HKLM\SYSTEM\Internet Communication Management\Internet Communication" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0 /f
 
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v AcceptTrustedPublisherCerts /t Reg_DWORD /d 1
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v ElevateNonAdmins /t Reg_DWORD /d 1
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v TargetGroupEnabled /t Reg_DWORD /d 0
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v AcceptTrustedPublisherCerts /t Reg_DWORD /d 1 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v ElevateNonAdmins /t Reg_DWORD /d 1 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v TargetGroupEnabled /t Reg_DWORD /d 0 /f
 
 			if "%VERSION%" == "10.0" (
 				echo Setting Additional Windows 10 Keys	(To Prevent Update to 11)
-				REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v TargetReleaseVersion /t REG_DWORD /d 1
-				REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v TargetReleaseVersionInfo /t REG_SZ /d "20H2"
-				REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v ProductVersion /t REG_SZ /d "Windows 10"
+				REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v TargetReleaseVersion /t REG_DWORD /d 1 /f
+				REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v TargetReleaseVersionInfo /t REG_SZ /d "20H2" /f
+				REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v ProductVersion /t REG_SZ /d "Windows 10" /f
 			)
 
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AUOptions /t Reg_DWORD /d 3
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AutoInstallMinorUpdates /t Reg_DWORD /d 1
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v DetectionFrequency /t Reg_DWORD /d 6
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v DetectionFrequencyEnabled /t Reg_DWORD /d 1
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoRebootWithLoggedOnUsers /t Reg_DWORD /d 1
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoUpdate /t Reg_DWORD /d 0
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootRelaunchTimeout /t Reg_DWORD /d 270
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootRelaunchTimeoutEnabled /t Reg_DWORD /d 1
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootWarningTimeout /t Reg_DWORD /d 30
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootWarningTimeoutEnabled /t Reg_DWORD /d 1
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RescheduleWaitTime /t Reg_DWORD /d 15
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RescheduleWaitTimeEnabled /t Reg_DWORD /d 1
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallDay /t Reg_DWORD /d 0
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallTime /t Reg_DWORD /d 20
-			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v UseWUServer /t Reg_DWORD /d 0
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AUOptions /t Reg_DWORD /d 3 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AutoInstallMinorUpdates /t Reg_DWORD /d 1 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v DetectionFrequency /t Reg_DWORD /d 6 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v DetectionFrequencyEnabled /t Reg_DWORD /d 1 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoRebootWithLoggedOnUsers /t Reg_DWORD /d 1 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoUpdate /t Reg_DWORD /d 0 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootRelaunchTimeout /t Reg_DWORD /d 270 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootRelaunchTimeoutEnabled /t Reg_DWORD /d 1 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootWarningTimeout /t Reg_DWORD /d 30 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RebootWarningTimeoutEnabled /t Reg_DWORD /d 1 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RescheduleWaitTime /t Reg_DWORD /d 15 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v RescheduleWaitTimeEnabled /t Reg_DWORD /d 1 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallDay /t Reg_DWORD /d 0 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallTime /t Reg_DWORD /d 20 /f
+			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v UseWUServer /t Reg_DWORD /d 0 /f
 
 
 	:: ----- Resetting Winsock -----
