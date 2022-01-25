@@ -32,9 +32,25 @@ exit
 :: void components();
 :: /*************************************************************************************/
 	
+:: Grab the Windows Version # Example variable: %VERSION% = "10.0"
+
+	setlocal
+	for /f "tokens=2 delims=[]" %%i in ('ver') do set VERSION=%%i
+	for /f "tokens=2-3 delims=. " %%i in ("%VERSION%") do set VERSION=%%i.%%j
+
+
 	:: ----- Stopping the Windows Update services -----
 
 :WUReset
+
+	echo.
+	echo.
+	echo Windows Update Reset Unattended Repair v1.2
+	echo.
+	echo.
+
+	sleep 5
+
 	echo Stopping the Windows Update services.
 	net stop bits /y
 
@@ -237,9 +253,11 @@ exit
 	echo 7) Resolving WSUS Client Settings and deleting bogus registry keys ... (ignore any missing keys)
 
 		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /F
-		
+			:: Nuke all nonsense left for Windows Update Registry Keys / Settings over time
+
 		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /F
 			:: \Policies\Microsoft\Windows\WindowsUpdate DOES NOT EXIST in Newer (20H2) Versions of Windows
+			:: Keys get deleted and 
 
 		REG DELETE "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /F
 			:: \Policies\Explorer Completely Empty in Newer (20H2) Versions of Windows
@@ -253,13 +271,21 @@ exit
 	echo Setting Default Registry Keys from Microsoft...
 
 			REG ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoWindowsUpdate /t Reg_DWORD /d 0
-			REG ADD "HKLM\SYSTEM\Internet Communication Management\Internet Communication" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0
 			REG ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0
+
+			REG ADD "HKLM\SYSTEM\Internet Communication Management\Internet Communication" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0
 
 			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v AcceptTrustedPublisherCerts /t Reg_DWORD /d 1
 			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v DisableWindowsUpdateAccess /t Reg_DWORD /d 0
 			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v ElevateNonAdmins /t Reg_DWORD /d 1
 			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /v TargetGroupEnabled /t Reg_DWORD /d 0
+
+			if "%VERSION%" == "10.0" (
+				echo Setting Additional Windows 10 Keys	(To Prevent Update to 11)
+				REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v TargetReleaseVersion /t REG_DWORD /d 1
+				REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v TargetReleaseVersionInfo /t REG_SZ /d "20H2"
+				REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v ProductVersion /t REG_SZ /d "Windows 10"
+			)
 
 			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AUOptions /t Reg_DWORD /d 3
 			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AutoInstallMinorUpdates /t Reg_DWORD /d 1
@@ -276,7 +302,6 @@ exit
 			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallDay /t Reg_DWORD /d 0
 			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v ScheduledInstallTime /t Reg_DWORD /d 20
 			REG ADD "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v UseWUServer /t Reg_DWORD /d 0
-		:: Not Needed?	REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Orchestrator\InstallAtShutdown" /t Reg_DWORD /d 1
 
 
 	:: ----- Resetting Winsock -----
