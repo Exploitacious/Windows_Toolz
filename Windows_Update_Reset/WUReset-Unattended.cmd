@@ -237,10 +237,15 @@ exit
 	echo 7) Resolving WSUS Client Settings and deleting bogus registry keys ... (ignore any missing keys)
 
 		REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" /F
+		
 		REG DELETE "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate" /F
+			:: \Policies\Microsoft\Windows\WindowsUpdate DOES NOT EXIST in Newer (20H2) Versions of Windows
 
-		REG DELETE "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoWindowsUpdate /F 
-		REG DELETE "HKLM\SYSTEM\Internet Communication Management\Internet Communication" /v DisableWindowsUpdateAccess /F 
+		REG DELETE "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /F
+			:: \Policies\Explorer Completely Empty in Newer (20H2) Versions of Windows
+
+		REG DELETE "HKLM\SYSTEM\Internet Communication Management\Internet Communication" /F 
+			:: \Internet Communication Management\Internet Communication DOES NOT EXIST in Newer (20H2) Versions of Windows
 
 
 ::		Set Defaults from Microsoft https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-R2-and-2008/dd939844(v=ws.10)?redirectedfrom=MSDN#registry-keys-for-configuring-automatic-updates
