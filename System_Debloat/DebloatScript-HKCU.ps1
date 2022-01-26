@@ -79,7 +79,7 @@
 
 	Write-Host -ForegroundColor "Red" Removing Weather Taskbar Widget...
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds" -Name "ShellFeedsTaskbarViewMode" -Type DWord -Value 2
-
+		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds" -Name "HeadlinesOnboardingComplete" -Type DWord -Value 1
 
 
 # Other Modifications

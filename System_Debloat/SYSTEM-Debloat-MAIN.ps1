@@ -469,6 +469,8 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 
 	Write-Host -ForegroundColor $NotificationColor Removing Weather Taskbar Widget...
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds" -Name "ShellFeedsTaskbarViewMode" -Type DWord -Value 2
+		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds" -Name "HeadlinesOnboardingComplete" -Type DWord -Value 1
+
 
 	Write-Host -ForegroundColor $NotificationColor Unpinning all Start Menu tiles...
 		If ([System.Environment]::OSVersion.Version.Build -ge 15063 -And [System.Environment]::OSVersion.Version.Build -le 16299) {
