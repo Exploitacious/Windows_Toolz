@@ -167,6 +167,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 	"*Spotify*"
 	"*StickyNotes*"
 	"*Sway*"
+	"*Teams*"
 	"*TheNewYorkTimes*"
 	"*TuneIn*"
 	"*Twitter*"
