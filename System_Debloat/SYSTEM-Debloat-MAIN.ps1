@@ -97,6 +97,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 	$Bloatware = @(
 	"*562882FEEB491*" # Code Writer from Actipro Software LLC
 	"*ActiproSoftware*"
+	"*Alexa*"
 	"*AIMeetingManager*"
 	"*AdobePhotoshopExpress*"
 	"*Advertising*"
@@ -133,7 +134,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 	"*Instagram*"
 	"*Keeper*"
 	"*king.com*"
-	"*LenovoCompanion*"
+	"*Lenovo*"
 	"*Lens*"
 	"*LinkedInforWindows*"
 	"*MarchofEmpires*"
