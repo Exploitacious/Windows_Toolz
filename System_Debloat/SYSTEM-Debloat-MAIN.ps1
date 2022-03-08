@@ -114,7 +114,7 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 	"*Casino*"
 	"*COOKINGFEVER*"
 	"*CyberLink*"
-	"*DisneyMagicKingdoms*"
+	"*Disney*"
 	"*Dolby*"
 	"*DrawboardPDF*"
 	"*Duolingo*"
