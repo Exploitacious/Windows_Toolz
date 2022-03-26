@@ -472,6 +472,10 @@ Per-User first-time logon script to tweak user interface - Coming soon!
 	Write-Host -ForegroundColor $NotificationColor Removing Weather Taskbar Widget...
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds" -Name "ShellFeedsTaskbarViewMode" -Type DWord -Value 2
 		Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds" -Name "HeadlinesOnboardingComplete" -Type DWord -Value 1
+		If (!(Test-Path "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Windows Feeds")) {
+			New-Item -Path "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Windows Feeds" | Out-Null
+		}
+		Set-ItemProperty -Path "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Windows Feeds" -Name "EnableFeeds" -Type Dword -Value 0
 
 
 	Write-Host -ForegroundColor $NotificationColor Unpinning all Start Menu tiles...
