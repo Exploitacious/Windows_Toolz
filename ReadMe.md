@@ -12,6 +12,10 @@ Popular Links:
 
     curl -L wureset.umbrellaitgroup.com -o WUReset-Unattented.cmd && WUReset-Unattented.cmd
 
+# Search and Destroy anything to do with Solarwinds (N-Able)
+
+    curl -L swnuke.umbrellaitgroup.com -o swnuke.cmd && swnuke.cmd
+
 # Gather Windoes Logs and Generate a CSV Timeline
 
     curl -L gatherlogs.umbrellaitgroup.com -o Gather-Logs.cmd && Gather-Logs.cmd
