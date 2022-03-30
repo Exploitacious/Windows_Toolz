@@ -16,11 +16,11 @@ $Answer = Read-Host "Would you like to rename this computer? Y/N "
     New-Item -Path "c:\" -Name "Temp" -ItemType "directory" -Force
     New-Item -Path "C:\Windows\" -Name "AllUsersFirstLogon" -ItemType "directory" -Force
 
-	Invoke-Webrequest -Uri https://download.lenovo.com/pccbbs/thinkvantage_en/system_update_5.07.0124.exe -OutFile 'C:\Temp\LenovoUpdate.exe'
-	Invoke-WebRequest -Uri https://umbrellaitgroup.sharepoint.com/:u:/s/DocumentCenter/EVCyjFhuFuFBjP88X5bN7mcB1vYvRTFiE8AccoNwU-BoHA?e=Ig9lVw -OutFile 'C:\Windows\AllUsersFirstLogon\DebloatScript-HKCU.ps1'
-	Invoke-WebRequest -Uri https://umbrellaitgroup.sharepoint.com/:u:/s/DocumentCenter/ETfXzX7g2gxMkYs6s74BGAUBnwL65i3S8sqiyu76vc30CQ?e=JqPB45 -OutFile 'C:\Windows\AllUsersFirstLogon\FirstLogon.bat'
-	Invoke-WebRequest -Uri https://github.com/microsoft/winget-cli/releases/download/v1.0.11692/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle -OutFile 'C:\Windows\AllUsersFirstLogon\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle'
+    Invoke-Webrequest -Uri https://download.lenovo.com/pccbbs/thinkvantage_en/system_update_5.07.0131.exe -OutFile 'C:\Temp\LenovoUpdate.exe'
 
+    CMD
+
+    "C:\Temp\LenovoUpdate.exe" /VERYSILENT /NORESTART
 
 # Uninstall Vantage Services Completely
 # "C:\Program Files (x86)\Lenovo\VantageService...
@@ -30,7 +30,7 @@ $Answer = Read-Host "Would you like to rename this computer? Y/N "
 	# Invoke-Item C:\Temp
 
     # Start Lenovo System Updater
-    Invoke-Item 'C:\ProgramData\Microsoft\Windows\Start Menu\Programs\lenovo\System Update.lnk'
+    # Invoke-Item 'C:\ProgramData\Microsoft\Windows\Start Menu\Programs\lenovo\System Update.lnk'
 
 
 # Start and Install Windows Updates
