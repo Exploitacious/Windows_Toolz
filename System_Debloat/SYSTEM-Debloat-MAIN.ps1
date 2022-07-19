@@ -50,11 +50,11 @@ Windows Appx Bloatware Perma-Uninstall List
 	- To add or remove bloatware apps from this list, simply add then in quotes with wildcard * symbols.
 	- To make sure they'll be picked up and removed, test them on a machine by running:  get-appxpackage -name *appName*
 
-Per-User first-time logon script to tweak user interface - Coming soon!
-	- My goal is to deploy a mini script to run at first-time-logon for each user on the system to tweak the user interface into being nice and clean.
-	- Will run as per-user context.
+Per-User first-time logon script to tweak user interface -
+	- Runs a srcipt when a new user first logs in to get rid of some of the bloat over their Windows 10 UI
+	- 
+
 	
-	Stay tuned!
 
 #>
 
