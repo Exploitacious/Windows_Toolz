@@ -25,24 +25,29 @@ Registry Tweaks
 	- Disables Suggested Applications
 	- Disables Feedback
 	- Disables Windows Defender System Tray Icon (Visual Only)
-	- Disables entire IPv6 stavk
+	- Disables entire IPv6 stack
 	- Enables Windows Update Auto-Downloads
-	- Enabling Windows Search indexing service
-	- Enabling Superfetch service
-	- Enabling and Configuring System Restore for System Drive
+	- Enables Windows Search indexing service
+	- Enables Superfetch service
+	- Enables and Configures System Restore for System Drive
 	- Disable Fast-Startup
-	- Hiding people icon
-	- Showing Taskbar Search icon
-	- Enabling NumLock after startup
-	- Setting Control Panel view to small icons
-	- Enabling Clipboard History
-	- Disabling First Logon Animation
-	- Disabling Xbox features
-	- Enabling verbose startup/shutdown status messages
+	- Hides 'people' icon
+	- Showes Taskbar Search as icon only
+	- Enables NumLock after startup
+	- Sets Control Panel view to small icons
+	- Enables Clipboard History
+	- Disables First Logon Animation
+	- Enables verbose startup/shutdown status messages
+	- Disables Xbox features
 	- Showing all tray icons
-	- Unpinning all Start Menu tiles
-	- Removing Weather Taskbar Widget (Comment this out for any version previous to 20H2)
-	- Removing Meet Now Feature
+	- Unpinning all Start Menu tiles (replace with Intune policy or other policy for shortcuts)
+	- Removes Weather Taskbar Widget (Comment this out for any version previous to 20H2)
+	- Removes Meet Now Feature
+	- Removes the OOBE Privacy Settings Menu
+
+Windows WinGet Install (Disable with the variable: $EnableWinGet)
+	- Installs WinGet for Windows to allow better progromatic management of software on the machine
+
 
 Windows Appx Bloatware Perma-Uninstall List
 
@@ -51,7 +56,7 @@ Windows Appx Bloatware Perma-Uninstall List
 	- To make sure they'll be picked up and removed, test them on a machine by running:  get-appxpackage -name *appName*
 
 Per-User first-time logon script to tweak user interface -
-	- Runs a srcipt when a new user first logs in to get rid of some of the bloat over their Windows 10 UI
+	- Runs a srcipt when a new user first logs in to get rid of some of the bloat over their Windows 10 UI (Set the variable $EnableUserLogonScript to disable)
 	- 
 
 	
@@ -64,6 +69,8 @@ Write-Host
 Write-Host
 Write-Host
 $EnableUserLogonScript = $true
+$EnableWinGet = $true
+$EnableAppInstall = $true
 
 $ErrorActionPreference = 'SilentlyContinue'
 $NotificationColor = 'Yellow'
@@ -71,8 +78,8 @@ $NotificationColor = 'Yellow'
 $Button = [System.Windows.MessageBoxButton]::YesNoCancel
 $ErrorIco = [System.Windows.MessageBoxImage]::Error
 $Ask = 'Do you want to run this as an Administrator?
-			Select "Yes" to Run as an Administrator
-			Select "No" to not run this as an Administrator
+			Select "Yes" to attempt to run as an Administrator
+			Select "No" to not run this as an Administrator. (Not Recommended)
 			
 			Select "Cancel" to stop the script.'
 
@@ -193,14 +200,19 @@ $Bloatware = @(
 	"*ZuneVideo*"
 )
 
+$InstallPrograms = @( # Requires WinGet to be installed, or the switch enabled for automatically installing WinGet
+	"Company Portal"
+	"9N0DX20HK701" # Windows Terminal
+)
+
 # Debloat all the apps
 
 foreach ($App in $Bloatware) {
 
-	Write-Host Searching and Removing Package $App for All-Users
+	Write-Host Searching and Removing Package $App for All Users
 	Get-AppxPackage -Name $App -AllUsers | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue -Verbose
 						
-	Write-Host Searching and Removing Package $App for User
+	Write-Host Searching and Removing Package $App for Current User
 	Get-AppxPackage -Name $App | Remove-AppxPackage -ErrorAction SilentlyContinue -Verbose
 
 	Write-Host Searching and Removing Package $App for Provision Package
@@ -424,11 +436,13 @@ Write-Host -ForegroundColor $NotificationColor Showing Taskbar Search icon...
 Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Type DWord -Value 1
 
 
-Write-Host -ForegroundColor $NotificationColor Hiding People icon...
+Write-Host -ForegroundColor $NotificationColor Hiding People icon and weather widget...
 If (!(Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\People")) {
 	New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\People" | Out-Null
 }
 Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\People" -Name "PeopleBand" -Type DWord -Value 0
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Type DWord -Value 0
+
 
 
 Write-Host -ForegroundColor $NotificationColor Enabling Clipboard History...
@@ -514,9 +528,47 @@ If (!(Test-Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explor
 }
 Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "HideSCAMeetNow" -Type DWord -Value 1
 
+Write-Host -ForegroundColor $NotificationColor Removing OOBE Privacy Menu...
+If (!(Test-Path "HKLM:\Software\Policies\Microsoft\Windows\OOBE")) {
+	New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\OOBE" | Out-Null
+}
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\OOBE" -Name "DisablePrivacyExperience" -Type DWord -Value 1
+
+# Installing WinGet and Specified Apps
+If ( $EnableWinGet -eq $true) { 
+
+	try { 
+		winget.exe -ErrorAction Stop
+	}
+	catch {
+		Write-Host -ForegroundColor $NotificationColor "Installing WinGet"
+		Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted
+		Install-Script -Name winget-install -Force
+		winget-install.ps1
+	}
+}
+
+If ( $EnableAppInstall -eq $true) { 
+
+	foreach ($App in $InstallPrograms) {
+		# did not work to install app 2
+
+		try {
+			Get-AppxPackage -Name $App -ErrorAction Stop
+			Write-Host -ForegroundColor $NotificationColor "$App is installed"
+		}
+		catch {
+			Write-Host -ForegroundColor $NotificationColor "Installing $App"
+			
+			WinGet.exe install $App --accept-source-agreements --accept-package-agreements
+		}
+	}
+}
+
+
 # Run the User-Config Script
 ./DebloatScript-HKCU.ps1
-	
+
 
 # Implement User Logon Script
 
