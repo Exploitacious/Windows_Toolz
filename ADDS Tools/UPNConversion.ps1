@@ -27,46 +27,91 @@ if ($Answer -eq 'y' -or $Answer -eq 'yes') {
     Get-ADForest | Set-ADForest -UPNSuffixes @{add = $RoutableUPN }
 
 }
-else {
 
-    Write-Host -ForegroundColor Cyan "The following users will be converted..."
-    Write-Host
-    Get-ADUser -Filter "UserPrincipalName -like '*$localUPN'" -Properties Enabled | Sort-Object Name | Format-Table Name, UserPrincipalName
+Write-Host
+Write-Host "The following users need to be converted..."
+Write-Host
+Get-ADUser -Filter "UserPrincipalName -like '*$localUPN'" -Properties Enabled | Sort-Object Name | Format-Table Name, UserPrincipalName
 
-    $Answer = Read-Host "Continue and replace UPN Suffix? Y or N"
-    if ($Answer -eq 'y' -or $Answer -eq 'yes') {
-
-        $LocalUPNStar = "*" + $LocalUPN
-        $LocalUPNAT = "@" + $LocalUPN
-        $RoutableUPNAT = "@" + $RoutableUPN
-        $LocalUsers = Get-ADUser -Filter "UserPrincipalName -like '$LocalUPNStar'" -Properties userPrincipalName -ResultSetSize $null
-    
-        $LocalUsers | foreach { $newUpn = $_.UserPrincipalName.Replace("$LocalUPNAT", "$RoutableUPNAT"); $_ | Set-ADUser -UserPrincipalName $newUpn }
-        Write-Host
-        Write-Host -foregroundcolor Green "UPN Suffixes have been replaced"
-
-    }
-
-    Write-Host
-    Write-Host "Full List of UPNs:"
-    Write-Host
-    Get-ADUser -Filter * | Sort-Object Name | Format-Table Name, UserPrincipalName
-
-}
-
-$Answer = Read-Host "Do you need to add ProxyAddress Entires? This will convert the UPN to ProxyAddress. Only needs to be done once."
+$Answer = Read-Host "Would you like to migrate the user UPNs to the new Routable Domain?"
 if ($Answer -eq 'y' -or $Answer -eq 'yes') {
 
-    foreach ($user in (Get-ADUser -Filter * -Properties mail, ProxyAddresses, UserPrincipalName)) {
+    $LocalUPNStar = "*" + $LocalUPN
+    $LocalUPNAT = "@" + $LocalUPN
+    $RoutableUPNAT = "@" + $RoutableUPN
+    $LocalUsers = Get-ADUser -Filter "UserPrincipalName -like '$LocalUPNStar'" -Properties userPrincipalName -ResultSetSize $null
+    
+    $LocalUsers | foreach { $newUpn = $_.UserPrincipalName.Replace("$LocalUPNAT", "$RoutableUPNAT"); $_ | Set-ADUser -UserPrincipalName $newUpn }
+    Write-Host
+    Write-Host -foregroundcolor Green "UPN Suffixes have been replaced"
 
-        $user.ProxyAddresses = ("SMTP:" + $user.UserPrincipalName)
-        $user.mail = $user.UserPrincipalName
+}
 
-        Set-ADUser -instance $user
+Write-Host
+Write-Host "Full List of Proxy Addresses and UPNs:"
+Write-Host
+Get-ADUser -Filter * -Properties * | Select Name, ProxyAddress, UserPrincipalName 
+
+
+$Answer = Read-Host "Do you need to modify the ProxyAddress Entires? Hitting Y will convert the ProxyAddresses to 'SMTP:_UPN_'. Only needs to be done once after the UPN has modified."
+if ($Answer -eq 'y' -or $Answer -eq 'yes') {
+
+    foreach ($ADuser in (Get-ADUser -Filter * -Properties mail, ProxyAddresses, UserPrincipalName)) {
+
+        $ADuser.ProxyAddresses = ("SMTP:" + $ADuser.UserPrincipalName)
+        $ADuser.mail = $ADuser.UserPrincipalName
+
+        Set-ADUser -instance $ADuser
 
     }
 }
 
+Write-Host
+Write-Host "Current Exchange 'msExchMailboxGuid' properties:"
+Write-Host
+get-ADuser -Filter * -Properties * | Select Name, msExchMailboxGuid
+
+$Answer = Read-Host "Do you need to clear out the old Exchange Mailbox GUIDs? Only needs to be done once."
+if ($Answer -eq 'y' -or $Answer -eq 'yes') {
+
+    foreach ($user in (Get-ADUser -Filter *)) {
+
+        get-aduser $user | set-aduser -clear msExchMailboxGuid, legacyexchangedn, msexchmailboxsecuritydescriptor, msexchpoliciesincluded, msexchrecipientdisplaytype, msexchrecipienttypedetails, msexchumdtmfmap, msexchuseraccountcontrol, msexchversion, showInAddressBook
+
+    }
+
+}
+
+Write-Host
+Write-Host "Current Exchange 'mailNickname' properties:"
+Write-Host
+get-ADuser -Filter * -Properties * | Select Name, mailNickname
+
+$Answer = Read-Host "Do you need to modify the mailNickname to be the SamAccountName? Only needs to be done once."
+if ($Answer -eq 'y' -or $Answer -eq 'yes') {
+
+    foreach ($user in (Get-ADUser -Filter * -Properties mailNickname)) {
+
+        $NewName = $user.SamAccountName
+        get-aduser $NewName | Set-ADUser -Replace @{MailNickName = $NewName }
+    }
+}
+
+Write-Host
+Write-Host "Current adminCount properties:"
+Write-Host
+get-ADuser -Filter * -Properties * | Select Name, adminCount
+
+$Answer = Read-Host "Do you need to clear out the AdminCount? You will not be able to SSPR if adminCount is set."
+if ($Answer -eq 'y' -or $Answer -eq 'yes') {
+
+    foreach ($user in (Get-ADUser -Filter *)) {
+
+        get-aduser $user | set-aduser -clear adminCount
+
+    }
+
+}
 
 ## End of Script
 
