@@ -4,23 +4,32 @@
 
 #####
 # Environemntal Variables # Blank out for Datto RMM Inputs
-# $env:usrUDF = 14
+$env:usrUDF = 14
 
 ######
 # Code
 
-$localAdmins = @()
-$localAdmins += Get-LocalGroupMember -Name 'Administrators'
+$localAdmins = $null
+$varUDFString = $null
+$localAdmins = Get-LocalGroupMember -Name "Administrators"
 
-$varUDFString = $localAdmins
+$Stringify = $localAdmins.Name | Out-String -Stream -Width 255
+
+foreach ( $item in $Stringify ) { 
+    $varUDFString += "$item, "
+}
+
+# write-host $varUDFString.GetType()
 
 # Write to UDF
 if ($env:usrUDF -ge 1) {    
     if ($varUDFString.length -gt 255) {
-        Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString.substring(0, 255)) -Force
+        Write-Host $varUDFString
+        # Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString.substring(0, 255)) -Force
     }
     else {
-        Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString) -Force
+        Write-Host $varUDFString
+        # Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString) -Force
     }
 }
 else {
