@@ -4,14 +4,13 @@
 
 #####
 # Environemntal Variables # Blank out for Datto RMM Inputs
-$env:usrUDF = 14
+# $env:usrUDF = 14
 
 ######
 # Code
 
 $localAdmins = @()
 $localAdmins += Get-LocalGroupMember -Name 'Administrators'
-Write-Host $localAdmins
 
 $varUDFString = $localAdmins
 
