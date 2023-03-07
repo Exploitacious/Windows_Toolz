@@ -8,10 +8,14 @@ Sounds an alert if DNS Filter has not checked in for over 24 hours or is not run
 - Restarts the service
 - Performs an uninstall if necessary
 
+Facts:
+- The correct version to be running is version 'DNS Agent', NOT DNSFilter Agent
+- Reg Keys should only be in HKLM:Software\DNSAgent\Agent, nowhere else.
+
 #>
 
 # Verify Admin Session
-# if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
 # Set Diagnostic Log & Status
 $Global:DiagMsg = @()
@@ -89,7 +93,7 @@ Write-Host "DNS Filter Health Check"
 $Global:DiagMsg += "Running Diagnostic on DNS Filter Agent"
 
 try {
-    $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSFilter\Agent" -Name LastAPISync -ErrorAction Stop
+    $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name LastAPISync -ErrorAction Stop
     if ($Global:LastSync.Length -le 0) {
         $Global:DiagMsg += "Unable to gather a 'last Sync Date'"
         $Global:Status = 1
@@ -122,15 +126,15 @@ elseif ($Global:Status -eq 1) {
 
     # Evaluate DNSF Filter Service / Run uninstalls in case not found.
     try {
-        $DNSFService = get-service "DNSFilter Agent" -ErrorAction Stop
+        $DNSAgentService = get-service "DNS Agent" -ErrorAction Stop
     } 
-    # Failure to find DNSF Service..
+    # Failure to find DNS Agent Service..
     catch {
-        $Global:DiagMsg += "Failure to find the 'DNSFilter Agent' Service on this machine."
-        $Global:DiagMsg += "Checking for 'DNS Agent' Service instead, the incorrect version.."
+        $Global:DiagMsg += "Failure to find the 'DNS Agent' Service on this machine."
+        $Global:DiagMsg += "Checking for 'DNS Filter Agent' Service instead, the incorrect version.."
         try {
             # Uninstall everything.
-            get-service "DNS Agent" -ErrorAction Stop
+            $DNSFService = get-service "DNSFilter Agent" -ErrorAction Stop
             $Global:DiagMsg += "Incorrect version(s) found. Running Uninstall.."
             Uninstall-App "DNSFilter Agent"
             Uninstall-App "DNS Agent"
@@ -146,15 +150,15 @@ elseif ($Global:Status -eq 1) {
     }
             
     # If Services are running...
-    if ($DNSFService.status = "Running") {
+    if ($DNSAgentService.status = "Running") {
         # Service running but no sync date found. Restart service and re-try sync..
         $Global:DiagMsg += "Agent service reported good health. Restarting Service.."
-        Restart-Servce $DNSFService
+        Restart-Servce $DNSAgentService
         Start-Sleep 5
         $Global:DiagMsg += "Service restarted. Re-evaluating Sync status.."
         try {
             # Evaluate the last-sync date again, quit if still not found.
-            $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSFilter\Agent" -Name LastAPISync -ErrorAction Stop
+            $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name LastAPISync -ErrorAction Stop
             if ($Global:LastSync.Length -le 0) {
                 $Global:DiagMsg += "Still, unable to gather a 'last Sync Date'. Troubleshoot DNS Filter Service manually. Quitting.."
                 write-DRMMDiag $Global:DiagMsg
@@ -178,12 +182,12 @@ elseif ($Global:Status -eq 1) {
     else {
         $Global:DiagMsg += "Agent service reported stopped or unknown. Re-starting Service.."
         try {
-            Start-Servce $DNSFService -ErrorAction Stop
+            Start-Servce $DNSAgentService -ErrorAction Stop
             Start-Sleep 5
             $Global:DiagMsg += "Service restarted. Re-evaluating Sync status.."
             try {
                 # Evaluate the last-sync date again, quit if still not found.
-                $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSFilter\Agent" -Name LastAPISync -ErrorAction Stop
+                $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name LastAPISync -ErrorAction Stop
                 if ($Global:LastSync.Length -le 0) {
                     $Global:DiagMsg += "Still, unable to gather a 'last Sync Date'. Troubleshoot DNS Filter Service manually. Quitting.."
                     write-DRMMDiag $Global:DiagMsg
