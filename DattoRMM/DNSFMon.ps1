@@ -62,8 +62,7 @@ function Uninstall-DNSF-Regular {
 
 function Uninstall-App {
     $Global:DiagMsg += "Uninstalling $($args[0])"
-}
-<#     foreach ($obj in Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall") {
+    <#     foreach ($obj in Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall") {
         $dname = $obj.GetValue("DisplayName")
         if ($dname -contains $args[0]) {
             $uninstString = $obj.GetValue("UninstallString")
@@ -80,7 +79,8 @@ function Uninstall-App {
     start-sleep 5
     Remove-Item -ErrorAction SilentlyContinue -Path "HKLM:\Software\DNSFilter" -Recurse
     Remove-Item -ErrorAction SilentlyContinue -Path "HKLM:\Software\DNSAgent" -Recurse
-} #>
+#>
+}
 
 #############################################
 
@@ -106,19 +106,19 @@ catch {
 
 ## Write Output or Troubleshoot
 
-if ($Global:Status = 0) {
-    $Global:DiagMsg += "DNSF Agent is healthy."
-    write-DRMMDiag $Global:DiagMsg
-    exit 0
-}
-elseif ($Global:Status = 2 -or $null) {
+if ($Global:Status -eq 2 -or $null) {
     $Global:DiagMsg += "Failure to diagnose. Quitting.."
     write-DRMMDiag $Global:DiagMsg
     exit 1
 }
+elseif ($Global:Status -eq 0) {
+    $Global:DiagMsg += "DNSF Agent is healthy. Quitting.."
+    write-DRMMDiag $Global:DiagMsg
+    exit 0
+}
 
 ## If Status is 1, troubleshoot failures.
-elseif ($Global:Status = 1) {
+elseif ($Global:Status -eq 1) {
 
     # Evaluate DNSF Filter Service / Run uninstalls in case not found.
     try {
@@ -214,12 +214,12 @@ elseif ($Global:Status = 1) {
 
     ## Write Output and end
 
-    if ($Global:Status = 0) {
+    if ($Global:Status -eq 0) {
         $Global:DiagMsg += "DNSF Agent is healthy."
         write-DRMMDiag $Global:DiagMsg
         exit 0
     }
-    elseif ($Global:Status = 2 -or 1) {
+    elseif ($Global:Status -eq 2 -or 1) {
         $Global:DiagMsg += "Failure to diagnose. DNS Filter service may be corrupt. Uninstalling.."
         Uninstall-App "DNSFilter Agent"
         Uninstall-App "DNS Agent"
