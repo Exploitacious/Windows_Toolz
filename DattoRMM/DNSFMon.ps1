@@ -13,8 +13,9 @@ Sounds an alert if DNS Filter has not checked in for over 24 hours or is not run
 # Verify Admin Session
 # if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
-# Set Diagnostic Log
-$DiagMsg = @()
+# Set Diagnostic Log & Status
+$Global:DiagMsg = @()
+$Global:Status = 0
 function write-DRMMDiag ($messages) {
     Write-Host  '<-Start Diagnostic->'
     foreach ($Message in $Messages) { $Message }
@@ -26,38 +27,43 @@ function write-DRMMAlert ($message) {
     Write-Host '<-End Result->'
 }
 
-function GetElapsedTime {
+function EvalDNSFSync {
     # Requires $SyncDateTime variable to be defined 
-    $DiagMsg += 
     try {
         # Grab and convert the last sync Date / Time to PS 'datetime'
         $culture = [System.Globalization.CultureInfo]::InvariantCulture  
-        $SyncDateTime = [datetime]::ParseExact($LastSync, 'yyyy-MM-dd HH:mm:ss', $culture).ToString('dd/MM/yyyy hh:mm:ss tt')
-        Write-Host "Last Sync Date/Time: $SyncDateTime"
+        $SyncDateTime = [datetime]::ParseExact($Global:LastSync, 'yyyy-MM-dd HH:mm:ss', $culture).ToString('dd/MM/yyyy hh:mm:ss tt')
 
         # Grab and compare the current Date / Time
         $CurrentDateTime = Get-Date -Format "dd/MM/yyyy hh:mm:ss tt"
         $Global:ElapsedTime = New-TimeSpan -Start $SyncDateTime -End $CurrentDateTime
         $Global:ElapsedHours = [math]::round($Global:ElapsedTime.TotalHours, 2)
-        Write-Host "Elapsed Time: $Global:ElapsedHours Hours"
     }
     catch {
-        write-DRMMAlert "Something unnexptected happened. Check the last sync time manually and make sure you can 'get-Date' with Powershell"
-        Exit 1
+        $Global:DiagMsg += "Something unnexptected happened. Check the last sync time manually and make sure you can 'get-Date' with Powershell"
+        $Global:Status = 2
+    }
+
+    If ($Global:ElapsedHours -ge 8) {
+        $Global:DiagMsg += "Sync difference is greater than 8 hours. Diagnosing..."
+        $Global:Status = 1
+    }
+    else {
+        $Global:DiagMsg += "Last sync $Global:ElapsedHours hour(s) ago."
+        $Global:Status = 0
     }
 }
 
 function Uninstall-DNSF-Regular {
     # Try regular method of uninstall
-    $DiagMsg +=
+    $Global:DiagMsg +=
     $Prod = Get-WMIObject -Classname Win32_Product | Where-Object Name -Match 'DNSFilter Agent' $Prod.UnInstall()
 }
 
-function Uninstall-Force {
-    # Try forcable method of re-install
-    $DiagMsg +=
-    Write-Output "Uninstalling $($args[0])"
-    foreach ($obj in Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall") {
+function Uninstall-App {
+    $Global:DiagMsg += "Uninstalling $($args[0])"
+}
+<#     foreach ($obj in Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall") {
         $dname = $obj.GetValue("DisplayName")
         if ($dname -contains $args[0]) {
             $uninstString = $obj.GetValue("UninstallString")
@@ -65,8 +71,8 @@ function Uninstall-Force {
                 $found = $line -match '(\{.+\}).*'
                 If ($found) {
                     $appid = $matches[1]
-                    Write-Output $appid
                     start-process "msiexec.exe" -arg "/X $appid /qb" -Wait
+                    $Global:DiagMsg += "Successfully removed $appid"
                 }
             }
         }
@@ -74,78 +80,151 @@ function Uninstall-Force {
     start-sleep 5
     Remove-Item -ErrorAction SilentlyContinue -Path "HKLM:\Software\DNSFilter" -Recurse
     Remove-Item -ErrorAction SilentlyContinue -Path "HKLM:\Software\DNSAgent" -Recurse
-}
-
-function TroubleshootDNSF {
-    # Troubleshoot DNSF and output diagnostic messages
-    $DiagMsg += try {
-        Get-Service 'DNSFilter Agent'
-        Write-Host "Agent service reported good health. Restarting Service..."
-        Restart-Servce "DNSFilter Agent"
-        Write-Host "Run this tool again at a later time to check if Sync has occured"
-    }
-    catch {
-        try {
-            Write-Host "Agent service did not respond. Restarting Service..."
-            Restart-Servce "DNSFilter Agent"
-            Start-Sleep 5
-            Get-Service "DNSFilter Agent"
-        }
-        catch {
-            try {
-                Write-Host "Agent service did not respond. Attempting Uninstall..."
-                # Uninstall-DNSF-Regular
-            }
-            catch {
-                Write-Host "Unable to uninstall with regular methods. Forcing Uninstall..."
-                # Uninstall-Force "DNSFilter Agent"
-                # Uninstall-Force "DNSFilter Agent"
-            }
-        } 
-    }
-}
+} #>
 
 #############################################
 
 Write-Host "DNS Filter Health Check"
 
-$DiagMsg += "Running Diagnostic on DNS Filter Agent"
+$Global:DiagMsg += "Running Diagnostic on DNS Filter Agent"
 
 try {
-    $LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSFilter\Agent" -Name LastAPISync
-    Write-Host $LastSync
+    $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSFilter\Agent" -Name LastAPISync -ErrorAction Stop
+    if ($Global:LastSync.Length -le 0) {
+        $Global:DiagMsg += "Unable to gather a 'last Sync Date'"
+        $Global:Status = 1
+    }
+    else {
+        EvalDNSFSync
+    }
 }
 catch {
     # Software is not installed / Key unavailable.
+    $Global:DiagMsg += "DNS Filter Software may not be installed. Diagnosing..."
+    $Global:Status = 1
 }
 
-if ($LastSync.Length -le 0) {
-    $DiagMsg += "Unable to gather a 'last Sync Date'"
-    Write-Host "Unable to get last sync"
-    TroubleshootDNSF
-}
-else {
-    Write-Host 5
-    GetElapsedTime
-    Write-Host 6
-}
+## Write Output or Troubleshoot
 
-If ($Global:ElapsedHours -ge 8) {
-    $DiagMsg += "Sync difference is greater than 8 hours. Diagnosing..."
-    Write-Host 7
-    TroubleshootDNSF
-    Write-Host "$Global:ElapsedHours"
-}
-else {
-    Write-Host "$Global:ElapsedHours"
-    $DiagMsg += "Last sync $Global:ElapsedHours hours ago."
-    $DiagMsg += "DNSF Agent is healthy."
-
-    write-DRMMDiag $DiagMsg
-    Write-Host 9
+if ($Global:Status = 0) {
+    $Global:DiagMsg += "DNSF Agent is healthy."
+    write-DRMMDiag $Global:DiagMsg
     exit 0
 }
+elseif ($Global:Status = 2 -or $null) {
+    $Global:DiagMsg += "Failure to diagnose. Quitting.."
+    write-DRMMDiag $Global:DiagMsg
+    exit 1
+}
 
-Write-Host 10
-write-DRMMDiag $DiagMsg
-exit 1
+## If Status is 1, troubleshoot failures.
+elseif ($Global:Status = 1) {
+
+    # Evaluate DNSF Filter Service / Run uninstalls in case not found.
+    try {
+        $DNSFService = get-service "DNSFilter Agent" -ErrorAction Stop
+    } 
+    # Failure to find DNSF Service..
+    catch {
+        $Global:DiagMsg += "Failure to find the 'DNSFilter Agent' Service on this machine."
+        $Global:DiagMsg += "Checking for 'DNS Agent' Service instead, the incorrect version.."
+        try {
+            # Uninstall everything.
+            get-service "DNS Agent" -ErrorAction Stop
+            $Global:DiagMsg += "Incorrect version(s) found. Running Uninstall.."
+            Uninstall-App "DNSFilter Agent"
+            Uninstall-App "DNS Agent"
+            write-DRMMDiag $Global:DiagMsg
+            exit 0
+        }
+        catch {
+            # Abandon script if no services found.
+            $Global:DiagMsg += "Unable to find any DNSF Agent Services on this machine. Quitting.."
+            write-DRMMDiag $Global:DiagMsg
+            exit 1
+        }
+    }
+            
+    # If Services are running...
+    if ($DNSFService.status = "Running") {
+        # Service running but no sync date found. Restart service and re-try sync..
+        $Global:DiagMsg += "Agent service reported good health. Restarting Service.."
+        Restart-Servce $DNSFService
+        Start-Sleep 5
+        $Global:DiagMsg += "Service restarted. Re-evaluating Sync status.."
+        try {
+            # Evaluate the last-sync date again, quit if still not found.
+            $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSFilter\Agent" -Name LastAPISync -ErrorAction Stop
+            if ($Global:LastSync.Length -le 0) {
+                $Global:DiagMsg += "Still, unable to gather a 'last Sync Date'. Troubleshoot DNS Filter Service manually. Quitting.."
+                write-DRMMDiag $Global:DiagMsg
+                exit 1
+            }
+            else {
+                EvalDNSFSync
+            }
+            
+        }
+        catch {
+            $Global:DiagMsg += "DNS Filter service is running but may be corrupt. Uninstalling.."
+            Uninstall-App "DNSFilter Agent"
+            Uninstall-App "DNS Agent"
+            write-DRMMDiag $Global:DiagMsg
+            exit 0
+        }
+    }
+
+    # DNS Filter Services are stopped or unknown..
+    else {
+        $Global:DiagMsg += "Agent service reported stopped or unknown. Re-starting Service.."
+        try {
+            Start-Servce $DNSFService -ErrorAction Stop
+            Start-Sleep 5
+            $Global:DiagMsg += "Service restarted. Re-evaluating Sync status.."
+            try {
+                # Evaluate the last-sync date again, quit if still not found.
+                $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSFilter\Agent" -Name LastAPISync -ErrorAction Stop
+                if ($Global:LastSync.Length -le 0) {
+                    $Global:DiagMsg += "Still, unable to gather a 'last Sync Date'. Troubleshoot DNS Filter Service manually. Quitting.."
+                    write-DRMMDiag $Global:DiagMsg
+                    exit 1
+                }
+                else {
+                    EvalDNSFSync
+                }
+            }
+            catch {
+                # Uninstall if not able to re-start service.
+                $Global:DiagMsg += "Unable to start service. DNS Filter service may be corrupt. Uninstalling.."
+                Uninstall-App "DNSFilter Agent"
+                Uninstall-App "DNS Agent"
+                write-DRMMDiag $Global:DiagMsg
+                exit 0
+            } 
+        }
+        catch {
+            # Uninstall if not able to re-start service.
+            $Global:DiagMsg += "Unable to start service. DNS Filter service may be corrupt. Uninstalling.."
+            Uninstall-App "DNSFilter Agent"
+            Uninstall-App "DNS Agent"
+            write-DRMMDiag $Global:DiagMsg
+            exit 0
+        }
+    }
+
+    ## Write Output and end
+
+    if ($Global:Status = 0) {
+        $Global:DiagMsg += "DNSF Agent is healthy."
+        write-DRMMDiag $Global:DiagMsg
+        exit 0
+    }
+    elseif ($Global:Status = 2 -or 1) {
+        $Global:DiagMsg += "Failure to diagnose. DNS Filter service may be corrupt. Uninstalling.."
+        Uninstall-App "DNSFilter Agent"
+        Uninstall-App "DNS Agent"
+        write-DRMMDiag $Global:DiagMsg
+        exit 0
+    }
+
+}
