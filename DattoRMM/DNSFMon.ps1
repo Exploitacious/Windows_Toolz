@@ -66,7 +66,7 @@ function Uninstall-DNSF-Regular {
 
 function Uninstall-App {
     $Global:DiagMsg += "Uninstalling $($args[0])"
-    <#     foreach ($obj in Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall") {
+    foreach ($obj in Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall") {
         $dname = $obj.GetValue("DisplayName")
         if ($dname -contains $args[0]) {
             $uninstString = $obj.GetValue("UninstallString")
@@ -83,7 +83,6 @@ function Uninstall-App {
     start-sleep 5
     Remove-Item -ErrorAction SilentlyContinue -Path "HKLM:\Software\DNSFilter" -Recurse
     Remove-Item -ErrorAction SilentlyContinue -Path "HKLM:\Software\DNSAgent" -Recurse
-#>
 }
 
 #############################################
@@ -150,7 +149,7 @@ elseif ($Global:Status -eq 1) {
     }
             
     # If Services are running...
-    if ($DNSAgentService.status = "Running") {
+    if ($DNSAgentService.status -eq "Running") {
         # Service running but no sync date found. Restart service and re-try sync..
         $Global:DiagMsg += "Agent service reported good health. Restarting Service.."
         Restart-Servce $DNSAgentService
