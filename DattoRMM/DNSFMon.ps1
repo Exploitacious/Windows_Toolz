@@ -1,5 +1,7 @@
 <###
 DNS Filter Software Monitor by Alex Ivantsov
+@Exploitacious
+Alex@ivantsov.tech
 
 Sounds an alert if DNS Filter has not checked in for over 24 hours or is not running.
 Sounds alert and triggers uninstall process if agent is not healthy or unregistered from dashboard.
@@ -11,6 +13,9 @@ Provides option to automatically re-install DNSFilter (will be added in future r
 - Performs an uninstall if anything is not perfect.
 - Fires actionable alert through Datto RMM
 
+- Deploy as a DattoRMM MONITOR
+- Will return Alert and Diagnostic value if product was uninstalled or is missing
+
 Facts:
 - The correct version to be running is version 'DNS Agent', NOT DNSFilter Agent
 - Reg Keys should only be in HKLM:Software\DNSAgent\Agent, nowhere else.
@@ -20,12 +25,14 @@ Facts:
 # Verify Admin Session
 if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
-# Automatic Reinstall? Comment this out for Datto RMM Component
-$Global:Reinstall = $True
+# Automatic Reinstall (Will be added in future revision) Comment this out for Datto RMM Component
+# $Global:Reinstall = $True
 
 # Set Diagnostic Log & Status
 $Global:DiagMsg = @()
 $Global:Status = 0
+
+# Funcitons
 function write-DRMMDiag ($messages) {
     Write-Host  '<-Start Diagnostic->'
     foreach ($Message in $Messages) { $Message }
@@ -87,40 +94,72 @@ function Uninstall-App {
 
 #############################################
 
-Write-Host "DNS Filter Health Check"
+Write-Host " || DNS Filter Health Check || "
+Write-Host "Check the alerts and diagnostics for full details and output"
 
+$Global:DiagMsg += " || DNS Filter Health Check || "
 $Global:DiagMsg += "Running Diagnostic on DNS Filter Agent"
 
-try {
-    $Global:Registration = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name Registered -ErrorAction Stop
-    $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name LastAPISync -ErrorAction Stop
+#############################################
 
-    if ($Global:Registration -eq 1) {
-        $Global:DiagMsg += "Dashboard Registration state is valid."
-        $Global:Status = 0
-    }
-    else {
-        $Global:DiagMsg += "Dashboard Registration is orphaned."
-        $Global:Status = 1
-    }
+$DNSAExists = Test-Path "HKLM:\SOFTWARE\DNSAgent\Agent"
+$DNSFExists = Test-Path "HKLM:\SOFTWARE\DNSFilter\Agent"
 
-    if ($Global:LastSync.Length -le 0) {
-        $Global:DiagMsg += "Unable to gather a 'last Sync Date'"
-        $Global:Status = 1
+if ($DNSAExists -eq $DNSFExists) {
+    $Global:DiagMsg += "Discovered both DNSF and DNSA Agents.."
+    $Global:DiagMsg += "Agents are double-installed."
+    $Global:Status = 3
+}
+else {
+    if ($DNSAExists) {
+        # Correct Version for MSP's
+        $AgentVersion = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name Version
+        $Global:DiagMsg += "Correct DNS Agent is present. Version $AgentVersion"
     }
-    else {
-        EvalDNSFSync
+    if ($DNSFExists) {
+        # Incorrect Version for MSP's
+        $Global:DiagMsg += "Incorrect version (DNSF Agent) is present."
     }
 }
-catch {
-    # Software is not installed / Key unavailable.
-    $Global:DiagMsg += "DNS Filter Software may not be installed. Diagnosing..."
-    $Global:Status = 1
+
+if ($Global:Status -le 2) {
+    try {
+        $Global:Registration = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name Registered -ErrorAction Stop
+        $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name LastAPISync -ErrorAction Stop
+
+        if ($Global:Registration -eq 1) {
+            $Global:DiagMsg += "Dashboard Registration state is valid."
+            $Global:Status = 0
+        }
+        else {
+            $Global:DiagMsg += "Dashboard Registration is orphaned."
+            $Global:Status = 1
+        }
+
+        if ($Global:LastSync.Length -le 0) {
+            $Global:DiagMsg += "Unable to gather a 'last Sync Date'"
+            $Global:Status = 1
+        }
+        else {
+            EvalDNSFSync
+        }
+    }
+    catch {
+        # Software is not installed / Key unavailable.
+        $Global:DiagMsg += "DNS Filter Software may not be installed. Diagnosing..."
+        $Global:Status = 1
+    }
 }
 
-## Write Output or Troubleshoot
+## Write Output/Alert or Troubleshoot
 
-if ($Global:Status -eq 2 -or $null) {
+if ($Global:Status -eq 3) {
+    $Global:DiagMsg += "No Action taken, generating alert and exiting."
+    write-DRMMAlert "DNS Filter Agents are double-installed."
+    write-DRMMDiag $Global:DiagMsg
+    exit 1
+}
+elseif ($Global:Status -eq 2 -or $null) {
     $Global:DiagMsg += "Failure to diagnose. Attempting uninstall and quitting.."
     Uninstall-App "DNSFilter Agent"
     Uninstall-App "DNS Agent"
@@ -256,7 +295,7 @@ elseif ($Global:Status -eq 1) {
         }
     }
 
-    ## Write Output and end
+    ## Write Output and end.
 
     if ($Global:Status -eq 0) {
         $Global:DiagMsg += "DNSF Agent is healthy."
