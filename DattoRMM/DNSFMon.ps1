@@ -2,11 +2,14 @@
 DNS Filter Software Monitor by Alex Ivantsov
 
 Sounds an alert if DNS Filter has not checked in for over 24 hours or is not running.
+Sounds alert and triggers uninstall process if agent is not healthy or unregistered from dashboard.
+Provides option to automatically re-install DNSFilter (will be added in future revision)
 
-- Queries the Registry under the Software / DNS Filter / LastAPISync key
-- Does logic to figure out issue
+- Queries the Registry under the Software / DNS Filter / LastAPISync and Registered key 
+- Does logic...
 - Restarts the service
-- Performs an uninstall if necessary
+- Performs an uninstall if anything is not perfect.
+- Fires actionable alert through Datto RMM
 
 Facts:
 - The correct version to be running is version 'DNS Agent', NOT DNSFilter Agent
@@ -16,6 +19,9 @@ Facts:
 
 # Verify Admin Session
 if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
+
+# Automatic Reinstall? Comment this out for Datto RMM Component
+$Global:Reinstall = $True
 
 # Set Diagnostic Log & Status
 $Global:DiagMsg = @()
@@ -58,12 +64,6 @@ function EvalDNSFSync {
     }
 }
 
-function Uninstall-DNSF-Regular {
-    # Try regular method of uninstall
-    $Global:DiagMsg +=
-    $Prod = Get-WMIObject -Classname Win32_Product | Where-Object Name -Match 'DNSFilter Agent' $Prod.UnInstall()
-}
-
 function Uninstall-App {
     $Global:DiagMsg += "Uninstalling $($args[0])"
     foreach ($obj in Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall") {
@@ -100,7 +100,7 @@ try {
         $Global:Status = 0
     }
     else {
-        $Global:DiagMsg += "Dashboard Registration state is invalid."
+        $Global:DiagMsg += "Dashboard Registration is orphaned."
         $Global:Status = 1
     }
 
@@ -181,7 +181,7 @@ elseif ($Global:Status -eq 1) {
                 $Global:DiagMsg += "Dashboard Registration state is valid."
             }
             else {
-                $Global:DiagMsg += "Dashboard Registration state is invalid."
+                $Global:DiagMsg += "Dashboard Registration is orphaned."
                 $Global:DiagMsg += "Still, unable to gather a valid Dashboard Registration. Uninstalling.."
                 Uninstall-App "DNSFilter Agent"
                 Uninstall-App "DNS Agent"
