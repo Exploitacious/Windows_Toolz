@@ -57,7 +57,7 @@ function EvalDNSFSync {
         $Global:ElapsedHours = [math]::round($Global:ElapsedTime.TotalHours, 2)
     }
     catch {
-        $Global:DiagMsg += "Something unnexptected happened. Check the last sync time manually and make sure you can 'get-Date' with Powershell"
+        $Global:DiagMsg += "Something unnexptected happened when attempting to calculate sync elapsed time."
         $Global:Status = 2
     }
 
@@ -119,10 +119,11 @@ else {
     if ($DNSFExists) {
         # Incorrect Version for MSP's
         $Global:DiagMsg += "Incorrect version (DNSF Agent) is present."
+        $Global:Status = 2
     }
 }
 
-if ($Global:Status -le 2) {
+if ($Global:Status -le 1) {
     try {
         $Global:Registration = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name Registered -ErrorAction Stop
         $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name LastAPISync -ErrorAction Stop
@@ -160,7 +161,7 @@ if ($Global:Status -eq 3) {
     exit 1
 }
 elseif ($Global:Status -eq 2 -or $null) {
-    $Global:DiagMsg += "Failure to diagnose. Attempting uninstall and quitting.."
+    $Global:DiagMsg += "Attempting uninstall and quitting.."
     Uninstall-App "DNSFilter Agent"
     Uninstall-App "DNS Agent"
     write-DRMMAlert "Agent Troubled. Review diagnostic log."
