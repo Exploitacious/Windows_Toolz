@@ -92,7 +92,18 @@ Write-Host "DNS Filter Health Check"
 $Global:DiagMsg += "Running Diagnostic on DNS Filter Agent"
 
 try {
+    $Global:Registration = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name Registered -ErrorAction Stop
     $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name LastAPISync -ErrorAction Stop
+
+    if ($Global:Registration -eq 1) {
+        $Global:DiagMsg += "Dashboard Registration state is valid."
+        $Global:Status = 0
+    }
+    else {
+        $Global:DiagMsg += "Dashboard Registration state is invalid."
+        $Global:Status = 1
+    }
+
     if ($Global:LastSync.Length -le 0) {
         $Global:DiagMsg += "Unable to gather a 'last Sync Date'"
         $Global:Status = 1
@@ -110,12 +121,17 @@ catch {
 ## Write Output or Troubleshoot
 
 if ($Global:Status -eq 2 -or $null) {
-    $Global:DiagMsg += "Failure to diagnose. Quitting.."
+    $Global:DiagMsg += "Failure to diagnose. Attempting uninstall and quitting.."
+    Uninstall-App "DNSFilter Agent"
+    Uninstall-App "DNS Agent"
+    write-DRMMAlert "Agent Troubled. Review diagnostic log."
     write-DRMMDiag $Global:DiagMsg
     exit 1
+
 }
 elseif ($Global:Status -eq 0) {
     $Global:DiagMsg += "DNSF Agent is healthy. Quitting.."
+    write-DRMMAlert "Agent Healthy, last sync: $Global:ElapsedHours hour(s) ago."
     write-DRMMDiag $Global:DiagMsg
     exit 0
 }
@@ -137,12 +153,14 @@ elseif ($Global:Status -eq 1) {
             $Global:DiagMsg += "Incorrect version(s) found. Running Uninstall.."
             Uninstall-App "DNSFilter Agent"
             Uninstall-App "DNS Agent"
+            write-DRMMAlert "Agent Troubled. Review diagnostic log."
             write-DRMMDiag $Global:DiagMsg
-            exit 0
+            exit 1
         }
         catch {
             # Abandon script if no services found.
             $Global:DiagMsg += "Unable to find any DNSF Agent Services on this machine. Quitting.."
+            write-DRMMAlert "Agent Troubled. Review diagnostic log."
             write-DRMMDiag $Global:DiagMsg
             exit 1
         }
@@ -157,9 +175,26 @@ elseif ($Global:Status -eq 1) {
         $Global:DiagMsg += "Service restarted. Re-evaluating Sync status.."
         try {
             # Evaluate the last-sync date again, quit if still not found.
+            $Global:Registration = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name Registered -ErrorAction Stop
             $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name LastAPISync -ErrorAction Stop
+            if ($Global:Registration -eq 1) {
+                $Global:DiagMsg += "Dashboard Registration state is valid."
+            }
+            else {
+                $Global:DiagMsg += "Dashboard Registration state is invalid."
+                $Global:DiagMsg += "Still, unable to gather a valid Dashboard Registration. Uninstalling.."
+                Uninstall-App "DNSFilter Agent"
+                Uninstall-App "DNS Agent"
+                write-DRMMAlert "Agent Troubled. Review diagnostic log."
+                write-DRMMDiag $Global:DiagMsg
+                exit 1
+            }
+
             if ($Global:LastSync.Length -le 0) {
-                $Global:DiagMsg += "Still, unable to gather a 'last Sync Date'. Troubleshoot DNS Filter Service manually. Quitting.."
+                $Global:DiagMsg += "Still, unable to gather a 'last Sync Date'. Uninstalling.."
+                Uninstall-App "DNSFilter Agent"
+                Uninstall-App "DNS Agent"
+                write-DRMMAlert "Agent Troubled. Review diagnostic log."
                 write-DRMMDiag $Global:DiagMsg
                 exit 1
             }
@@ -172,8 +207,9 @@ elseif ($Global:Status -eq 1) {
             $Global:DiagMsg += "DNS Filter service is running but may be corrupt. Uninstalling.."
             Uninstall-App "DNSFilter Agent"
             Uninstall-App "DNS Agent"
+            write-DRMMAlert "Agent Troubled. Review diagnostic log."
             write-DRMMDiag $Global:DiagMsg
-            exit 0
+            exit 1
         }
     }
 
@@ -189,6 +225,9 @@ elseif ($Global:Status -eq 1) {
                 $Global:LastSync = Get-ItemPropertyValue "HKLM:\SOFTWARE\DNSAgent\Agent" -Name LastAPISync -ErrorAction Stop
                 if ($Global:LastSync.Length -le 0) {
                     $Global:DiagMsg += "Still, unable to gather a 'last Sync Date'. Troubleshoot DNS Filter Service manually. Quitting.."
+                    Uninstall-App "DNSFilter Agent"
+                    Uninstall-App "DNS Agent"
+                    write-DRMMAlert "Agent Troubled. Review diagnostic log."
                     write-DRMMDiag $Global:DiagMsg
                     exit 1
                 }
@@ -201,8 +240,9 @@ elseif ($Global:Status -eq 1) {
                 $Global:DiagMsg += "Unable to start service. DNS Filter service may be corrupt. Uninstalling.."
                 Uninstall-App "DNSFilter Agent"
                 Uninstall-App "DNS Agent"
+                write-DRMMAlert "Agent Troubled. Review diagnostic log."
                 write-DRMMDiag $Global:DiagMsg
-                exit 0
+                exit 1
             } 
         }
         catch {
@@ -210,8 +250,9 @@ elseif ($Global:Status -eq 1) {
             $Global:DiagMsg += "Unable to start service. DNS Filter service may be corrupt. Uninstalling.."
             Uninstall-App "DNSFilter Agent"
             Uninstall-App "DNS Agent"
+            write-DRMMAlert "Agent Troubled. Review diagnostic log."
             write-DRMMDiag $Global:DiagMsg
-            exit 0
+            exit 1
         }
     }
 
@@ -219,6 +260,7 @@ elseif ($Global:Status -eq 1) {
 
     if ($Global:Status -eq 0) {
         $Global:DiagMsg += "DNSF Agent is healthy."
+        write-DRMMAlert "Agent Healthy, last sync: $Global:ElapsedHours hour(s) ago."
         write-DRMMDiag $Global:DiagMsg
         exit 0
     }
@@ -226,8 +268,9 @@ elseif ($Global:Status -eq 1) {
         $Global:DiagMsg += "Failure to diagnose. DNS Filter service may be corrupt. Uninstalling.."
         Uninstall-App "DNSFilter Agent"
         Uninstall-App "DNS Agent"
+        write-DRMMAlert "Agent Troubled. Review diagnostic log."
         write-DRMMDiag $Global:DiagMsg
-        exit 0
+        exit 1
     }
 
 }
