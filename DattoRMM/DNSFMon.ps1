@@ -155,7 +155,9 @@ if ($Global:Status -le 1) {
 ## Write Output/Alert or Troubleshoot
 
 if ($Global:Status -eq 3) {
-    $Global:DiagMsg += "No Action taken, generating alert and exiting."
+    $Global:DiagMsg += "Uninstalling double-agents.."
+    Uninstall-App "DNSFilter Agent"
+    Uninstall-App "DNS Agent"
     write-DRMMAlert "DNS Filter Agents are double-installed."
     write-DRMMDiag $Global:DiagMsg
     exit 1
@@ -167,7 +169,6 @@ elseif ($Global:Status -eq 2 -or $null) {
     write-DRMMAlert "Agent Troubled. Review diagnostic log."
     write-DRMMDiag $Global:DiagMsg
     exit 1
-
 }
 elseif ($Global:Status -eq 0) {
     $Global:DiagMsg += "DNSF Agent is healthy. Quitting.."
