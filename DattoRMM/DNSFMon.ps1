@@ -305,7 +305,7 @@ elseif ($Global:Status -eq 1) {
         write-DRMMDiag $Global:DiagMsg
         exit 0
     }
-    elseif ($Global:Status -eq 2 -or 1) {
+    elseif ($Global:Status -ge 0) {
         $Global:DiagMsg += "Failure to diagnose. DNS Filter service may be corrupt. Uninstalling.."
         Uninstall-App "DNSFilter Agent"
         Uninstall-App "DNS Agent"
