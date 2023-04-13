@@ -8,8 +8,9 @@
 #Requires -Version 5.0
 #Requires -RunAsAdministrator
 
-Write-Host -ForegroundColor cyan 'Define PowerShell to use TLS1.2 in this session, needed since 1st April 2020 (https://devblogs.microsoft.com/powershell/powershell-gallery-tls-support/)'
-[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+# Define and use TLS1.2
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 
+Install-Module PowerShellGet -RequiredVersion 2.2.4 -SkipPublisherCheck
 
 # if needed
 # Register PSGallery PSprovider and set as Trusted source
