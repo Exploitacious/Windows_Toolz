@@ -142,10 +142,10 @@ Configuration Server2019_MemberServer {
             # 2.3.7.3 (CIS Baseline Level 1) Ensure 'Interactive logon: Machine inactivity limit' is set to '900 or fewer second(s), but not 0'
             Interactive_logon_Machine_inactivity_limit                                                                      = '900' 
             # 2.3.7.4 (CIS Baseline Level 1) Configure 'Interactive logon: Message text for users attempting to log on' 
-            Interactive_logon_Message_text_for_users_attempting_to_log_on                                                   = 'This system is restricted to authorized users. Individuals who attempt unauthorized access will be prosecuted. If you are unauthorized terminate access now. Click OK to indicate your acceptance of this information.'
+            #Interactive_logon_Message_text_for_users_attempting_to_log_on                                                   = 'This system is restricted to authorized users. Individuals who attempt unauthorized access will be prosecuted. If you are unauthorized terminate access now. Click OK to indicate your acceptance of this information.'
             # 2.3.7.5 (CIS Baseline Level 1) Configure 'Interactive logon: Message title for users attempting to log on'
             #Interactive_logon_Message_title_for_users_attempting_to_log_on = '<Logon Warning>'
-            Interactive_logon_Message_title_for_users_attempting_to_log_on                                                  = 'Logon Warning'
+            #Interactive_logon_Message_title_for_users_attempting_to_log_on                                                  = 'Logon Warning'
             # 2.3.7.6 (CIS Baseline Level 2) Ensure 'Interactive logon: Number of previous logons to cache (in case domain controller is not available)' is set to '4 or fewer logon(s)' (MS only) 
             Interactive_logon_Number_of_previous_logons_to_cache_in_case_domain_controller_is_not_available                 = '0'
             # 2.3.7.7 (CIS Baseline Level 1) Ensure 'Interactive logon: Prompt user to change password before expiration' is set to 'between 5 and 14 days'
