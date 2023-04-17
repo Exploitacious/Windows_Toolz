@@ -7,7 +7,17 @@ Configuration SecurityBaselineConfigurationWS2022
 
 	Node localhost
 	{
-	 	Registry "CCE-37615-2: Ensure 'Accounts: Limit local account use of blank passwords to console logon only' is set to 'Enabled'"
+        WindowsFeature 'Telnet-Client' {
+            Name   = 'Telnet-Client'
+            Ensure = 'Absent'
+        }
+
+        WindowsFeature 'SMB1' {
+            Name   = 'FS-SMB1'
+            Ensure = 'Absent'
+        } 
+
+		Registry "CCE-37615-2: Ensure 'Accounts: Limit local account use of blank passwords to console logon only' is set to 'Enabled'"
 	 	{
 	 	 	ValueName = 'LimitBlankPasswordUse'
 	 	 	ValueType = 'DWORD'
@@ -1777,7 +1787,7 @@ Configuration SecurityBaselineConfigurationWS2022
 		{
 			Policy = 'Deny_access_to_this_computer_from_the_network'
 			Force = $True
-			Identity = @('BUILTIN\Guests'
+			Identity = @('BUILTIN\Guests', 'Local account'
 			)
 
 		}
@@ -2068,18 +2078,7 @@ Configuration SecurityBaselineConfigurationWS2022
 			)
 
 		}
-		
-        AccountPolicy AccountPolicies
-        {
-            Name = 'PasswordPolicies'
-            Enforce_password_history = 24
-            Maximum_Password_Age = 0
-            Minimum_Password_Age = 1
-            Minimum_Password_Length = 14
-            Password_must_meet_complexity_requirements = 'Disabled'
-            Store_passwords_using_reversible_encryption = 'Disabled'
-
-        }
+				
 
 
 	}
