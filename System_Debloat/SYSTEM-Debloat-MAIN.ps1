@@ -205,6 +205,10 @@ $Bloatware = @(
  "*whatsApp*"
  "*Prime*"
  "*Insta*"
+ "*Family*"
+ "*copilot*"
+ "*Mahjong*"
+ 
  
 )
 
