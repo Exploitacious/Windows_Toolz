@@ -198,6 +198,18 @@ $Bloatware = @(
 	"*YourPhone*"
 	"*ZuneMusic*"
 	"*ZuneVideo*"
+ "*TikTok*"
+ "*ESPN*"
+ "*Messenger*"
+ "*Clipchamp*"
+ "*whatsApp*"
+ "*Prime*"
+ "*Insta*"
+ "*Family*"
+ "*copilot*"
+ "*Mahjong*"
+ 
+ 
 )
 
 $InstallPrograms = @( # Requires WinGet to be installed, or the switch enabled for automatically installing WinGet
