@@ -10,8 +10,6 @@ $isWin11 = (Get-WmiObject Win32_OperatingSystem).Caption -Match "Windows 11"
 $ErrorActionPreference = 'SilentlyContinue'
 $NotificationColor = 'Yellow'
 
-
-
 #########
 # Registry Tweaks
 Write-Host "Modifying Registry for better User Experience"
@@ -407,7 +405,6 @@ if ($isWin11) {
 	Write-Host -ForegroundColor Green "Launching CMD - HKLM Srcipts"
 	Start-Sleep 3
 	cmd.exe /c "C:\Temp\Cleanup\Cmd-HKLM.cmd"
-	cmd.exe /c "C:\Temp\Cleanup\Cmd-HKCU.cmd"
 }
 
 Write-Host -ForegroundColor Green "Launching PS - HKCU Srcipts"

@@ -1,6 +1,9 @@
 # Powershell script for running as Current User - run once at logon
 # This script DOES NOT require any admin rights to run. Should be ran as logged-on user context.
 
+# Discovery
+$isWin11 = (Get-WmiObject Win32_OperatingSystem).Caption -Match "Windows 11"
+
 Write-Host -ForegroundColor $NotificationColor Disabling Cortana...
 If (!(Test-Path "HKCU:\Software\Microsoft\Personalization\Settings")) {
 	New-Item -Path "HKCU:\Software\Microsoft\Personalization\Settings" -Force | Out-Null
@@ -110,4 +113,8 @@ If (!(Test-Path "HKCU:\Software\Policies\Microsoft\Windows\OOBE")) {
 }
 Set-ItemProperty -Path "HKCU:\Software\Policies\Microsoft\Windows\OOBE" -Name "DisablePrivacyExperience" -Type DWord -Value 1
 
-Write-Output "Please Restart Explorer"
+if ($isWin11) {
+	Write-Host -ForegroundColor Green "Launching CMD - HKCU Srcipts"
+	Start-Sleep 3
+	cmd.exe /c "C:\Temp\Cleanup\Cmd-HKCU.cmd"
+}
