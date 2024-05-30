@@ -206,7 +206,7 @@ foreach ($MsiBloat in $MsiBloatList ) {
         }
     }
     if ( -not $EntryFound ) {
-        Write-Host "No match for '$MsiBloat'"
+        Write-Host "No match for MSI '$MsiBloat'"
         # Exit 20
     }
 }

@@ -44,9 +44,9 @@ do {
 } while ($i -gt 0)
 
 Write-Host "Launching Winget Auto Update and New App Installations"
-Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"C:\Temp\Cleanup\Windows_Toolz\InstallNewApps.ps1.ps1`"" -Verb RunAs
+Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"C:\Temp\Cleanup\Windows_Toolz\InstallNewApps.ps1`"" -Verb RunAs
 
-$i = 5 #Seconds
+$i = 60 #Seconds
 do {
     Write-Host $i
     Sleep 1
