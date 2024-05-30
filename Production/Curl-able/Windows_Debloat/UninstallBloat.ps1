@@ -1,5 +1,7 @@
 # Automated Bloat Removal
 
+Write-Host -ForegroundColor Green "Automated Bloat Removal for MSI and Appx"
+
 ## Pre-Reqs
 # Verify/Elevate Admin Session.
 if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }

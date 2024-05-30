@@ -23,4 +23,4 @@ Write-Host
 # Required Files (xyz...)
 
 Write-Host "Launching De-Bloat Processes..."
-Start-Process UninstallBloat.ps1
+Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"C:\Temp\Cleanup\UninstallBloat.ps1`"" -Verb RunAs

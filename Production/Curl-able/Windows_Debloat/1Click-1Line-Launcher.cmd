@@ -40,3 +40,5 @@
     SET ThisScriptsDirectory=C:\Temp\Cleanup\
     SET PowerShellScriptPath=%ThisScriptsDirectory%Main-Stager.ps1
     PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '%PowerShellScriptPath%'";
+
+:: Supply Arguments to the script on what to enable?
