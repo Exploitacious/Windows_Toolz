@@ -1,6 +1,6 @@
 # Automated Bloat Removal
-
 Write-Host -ForegroundColor Green "Automated Bloat Removal for MSI and Appx"
+Start-Sleep 3
 
 ## Pre-Reqs
 # Verify/Elevate Admin Session.

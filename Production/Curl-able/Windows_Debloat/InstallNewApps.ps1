@@ -1,9 +1,9 @@
 # Apps to Install Requires WinGet to be installed, or the switch enabled for automatically installing WinGet
+Write-Host -ForegroundColor Green "Install Winget, Winget Auto-Update, and required apps"
+Start-Sleep 3
 
 # Verify/Elevate Admin Session.
 if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
-
-
 
 $InstallPrograms = @(
     "Company Portal"

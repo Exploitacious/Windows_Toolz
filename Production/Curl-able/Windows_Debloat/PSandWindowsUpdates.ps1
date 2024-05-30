@@ -1,4 +1,6 @@
 # Powershell and Windows Updates
+Write-Host -ForegroundColor Green "Powershell modules and Windows Updates"
+Start-Sleep 3
 
 # This script provides informations about the module version (current and the latest available on PowerShell Gallery) and update to the latest version
 # If you have a module with two or more versions, the script delete them and reinstall only the latest.

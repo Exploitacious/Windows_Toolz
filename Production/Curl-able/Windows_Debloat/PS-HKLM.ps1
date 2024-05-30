@@ -1,15 +1,12 @@
 
 
 # Verify/Elevate Admin Session.
-if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
+# if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
 # Discovery
 $isWin11 = (Get-WmiObject Win32_OperatingSystem).Caption -Match "Windows 11"
 
 # Set Variables
-$EnableUserLogonScript = $true
-$EnableWindowsUpdates = $true
-$EnableOneDrivePerMachine = $true
 $ErrorActionPreference = 'SilentlyContinue'
 $NotificationColor = 'Yellow'
 
@@ -406,37 +403,12 @@ If (!(Test-Path "HKCU:\Software\Policies\Microsoft\Windows\OOBE")) {
 }
 Set-ItemProperty -Path "HKCU:\Software\Policies\Microsoft\Windows\OOBE" -Name "DisablePrivacyExperience" -Type DWord -Value 1
 
-Write-Output "Please Restart Explorer"
-$i = 10 #Seconds
-do {
-	Write-Host $i
-	Sleep 1
-	$i--
-} while ($i -gt 0)
-#Stop-Process -ProcessName explorer
+if ($isWin11) {
+	Write-Host -ForegroundColor Green "Launching CMD - HKLM Srcipts"
+	Start-Sleep 3
+	cmd.exe /c "C:\Temp\Cleanup\Cmd-HKLM.cmd"
+	cmd.exe /c "C:\Temp\Cleanup\Cmd-HKCU.cmd"
+}
 
-
-# Implement User Logon Script
-
-Write-Host "Creating Directories 'C:\Windows\FirstUserLogon' and Copying files"
-mkdir "C:\Windows\FirstUserLogon" -ErrorAction SilentlyContinue
-Copy-Item "DebloatScript-HKCU.ps1" "C:\Windows\FirstUserLogon\DebloatScript-HKCU.ps1"
-Copy-Item "FirstLogon.bat" "C:\Windows\FirstUserLogon\FirstLogon.bat"
-Write-Host
-
-Write-Host "Enabling Registry Keys to run Logon Script"
-REG LOAD HKEY_Users\DefaultUser "C:\Users\Default\NTUSER.DAT"
-Set-ItemProperty -Path "REGISTRY::HKEY_USERS\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Run" -Name "FirstUserLogon" -Value "C:\Windows\FirstUserLogon\FirstLogon.bat" -Type "String"
-REG UNLOAD HKEY_Users\DefaultUser
-	
-Write-Host "New User Logon Script Successfully Enabled"
-
-
-
-
-
-
-
-
-
-
+Write-Host -ForegroundColor Green "Launching PS - HKCU Srcipts"
+& C:\Temp\Cleanup\PS-HKCU.ps1
