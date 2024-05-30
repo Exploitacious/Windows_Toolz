@@ -31,10 +31,12 @@
     PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/PS-HKLM.ps1', 'PS-HKLM.ps1')"
     PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/PSandWindowsUpdates.ps1', 'PSandWindowsUpdates.ps1')"
     PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/UninstallBloat.ps1', 'UninstallBloat.ps1')"
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/Main-Stager.ps1', 'Main-Stager.ps1')"
+
 
 :: Start Running the SYSTEM DEBLOAT scripts
 :RunScript
 
     SET ThisScriptsDirectory=C:\Temp\Cleanup\
-    SET PowerShellScriptPath=%ThisScriptsDirectory%SYSTEM-Debloat-MAIN.ps1
+    SET PowerShellScriptPath=%ThisScriptsDirectory%Main-Stager.ps1
     PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '%PowerShellScriptPath%'";
