@@ -401,6 +401,38 @@ If (!(Test-Path "HKCU:\Software\Policies\Microsoft\Windows\OOBE")) {
 }
 Set-ItemProperty -Path "HKCU:\Software\Policies\Microsoft\Windows\OOBE" -Name "DisablePrivacyExperience" -Type DWord -Value 1
 
+
+####### Adobe AI Remediation
+#Check if in 64 bit POSH if not, relaunch
+If ($ENV:PROCESSOR_ARCHITEW6432 -eq "AMD64") {
+	Try {
+		&"$ENV:WINDIR\SysNative\WindowsPowershell\v1.0\PowerShell.exe" -File $PSCOMMANDPATH
+	}
+	Catch {
+		Throw "Failed to start $PSCOMMANDPATH"
+	}
+	Exit
+}
+#check for reg keys for Adobe Reader and DC
+$adobereader = Test-Path -Path 'HKLM:SOFTWARE\Policies\Adobe\Acrobat Reader\DC\FeatureLockDown'
+$adobedc = Test-Path -Path 'HKLM:SOFTWARE\Policies\Adobe\Adobe Acrobat\DC\FeatureLockDown'
+
+If (!($adobereader -or $adobedc)) {
+	Write-Output "Neither Program Detected"
+	Exit
+}
+#If keys exist add reg values
+If ($adobereader) {
+	New-ItemProperty "HKLM:SOFTWARE\Policies\Adobe\Acrobat Reader\DC\FeatureLockDown" -Name "bEnableFlash" -Value '0' -PropertyType DWORD -Force
+	New-ItemProperty "HKLM:SOFTWARE\Policies\Adobe\Acrobat Reader\DC\FeatureLockDown" -Name "bDisableJavaScript" -Value '1' -PropertyType DWORD -Force
+}
+
+If ($adobedc) {
+	New-ItemProperty "HKLM:SOFTWARE\Policies\Adobe\Adobe Acrobat\DC\FeatureLockDown" -Name "bDisableJavaScript" -Value '1' -PropertyType DWORD -Force
+}
+
+
+
 if ($isWin11) {
 	Write-Host -ForegroundColor Green "Launching CMD - HKLM Srcipts"
 	Start-Sleep 3
