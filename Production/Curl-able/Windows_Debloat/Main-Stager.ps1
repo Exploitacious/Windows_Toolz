@@ -24,3 +24,10 @@ Write-Host
 
 Write-Host "Launching De-Bloat Processes..."
 Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"C:\Temp\Cleanup\UninstallBloat.ps1`"" -Verb RunAs
+
+wait 5
+
+Write-Host "Launching PS Modules & Windows Updates"
+Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"C:\Temp\Cleanup\PSandWindowsUpdates.ps1`"" -Verb RunAs
+
+wait 5
