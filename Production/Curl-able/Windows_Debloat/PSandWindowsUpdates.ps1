@@ -104,3 +104,6 @@ else {
     Write-Host
     Write-Host "Updates Complete"
 }
+
+Write-Host
+Read-Host -Prompt "Finished! Press Enter to exit"

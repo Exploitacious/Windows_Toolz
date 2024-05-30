@@ -210,3 +210,6 @@ foreach ($MsiBloat in $MsiBloatList ) {
         # Exit 20
     }
 }
+
+Write-Host
+Read-Host -Prompt "Finished! Press Enter to exit"

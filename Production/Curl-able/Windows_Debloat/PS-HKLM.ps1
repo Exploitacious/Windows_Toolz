@@ -409,3 +409,6 @@ if ($isWin11) {
 
 Write-Host -ForegroundColor Green "Launching PS - HKCU Srcipts"
 & C:\Temp\Cleanup\PS-HKCU.ps1
+
+Write-Host
+Read-Host -Prompt "Finished! Press Enter to exit"

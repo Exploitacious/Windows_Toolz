@@ -56,4 +56,4 @@ Foreach ($NewApp in $InstallPrograms) {
     }
 }
 
-Write-Host "Finished"
+Read-Host -Prompt "Finished! Press Enter to exit"
