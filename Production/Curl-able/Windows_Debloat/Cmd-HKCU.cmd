@@ -46,7 +46,7 @@ REM ----------------------------------------------------------------------------
 	REM TITLE: Always show all icons in the notification area
 		REM LINK: N/A
 			REM OPTIONS: "1"=Never show, "0"=Always show
-				REG ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /V EnableAutoTray /T REG_DWORD /D "0x00000000" /F 1>NUL 2>&1
+				REM REG ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" /V EnableAutoTray /T REG_DWORD /D "0x00000000" /F 1>NUL 2>&1
 
 	REM TITLE: Remove People Button from Taskbar
 		REM LINK: N/A
@@ -317,7 +317,7 @@ REM Turn off transparency
 REG ADD "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /V "EnableTransparency" /T "REG_DWORD" /D "0x00000000" /F 1>NUL
 
 REM Tutorial: https://www.elevenforum.com/t/turn-on-or-off-hidden-icon-menu-on-taskbar-corner-in-windows-11.5132/
-REG ADD "HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\TrayNotify" /V "SystemTrayChevronVisibility" /T "REG_DWORD" /D "0x00000000" /F 1>NUL
+REG ADD "HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\TrayNotify" /V "SystemTrayChevronVisibility" /T "REG_DWORD" /D "0x00000001" /F 1>NUL
 
 REM Tutorial: https://www.elevenforum.com/t/disable-show-more-options-context-menu-in-windows-11.1589/
 REG ADD "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /V "" /D "" /F 1>NUL
