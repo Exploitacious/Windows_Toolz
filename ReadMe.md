@@ -1,6 +1,4 @@
-# Tools and Scripts for Windows 10, 11, and Server 2012+
-
-    This is a collection of scripts and tools to system administration easier.
+# Tools, Scripts and more for Windows 10, 11, and Server 2016+
 
 Popular Links:
 
@@ -8,7 +6,7 @@ Popular Links:
 
     curl -L cleanup.umbrellaitgroup.com -o cleanup.cmd && cleanup.cmd
 
-# Windows Update Reset 
+# Windows Update Reset
 
     curl -L wureset.umbrellaitgroup.com -o WUReset-Unattented.cmd && WUReset-Unattented.cmd
 
