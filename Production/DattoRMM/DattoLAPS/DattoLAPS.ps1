@@ -1,6 +1,30 @@
 # Datto RMM Local Admin Password Solution
 
 <#
+
+EXPLANATION:
+This PowerShell script is designed to manage local administrator passwords on machines, specifically for environments using Datto RMM (Remote Monitoring and Management). It performs the following tasks:
+
+1. **Password Generation**: It generates a new, random password for the local administrator account. The password is 25 characters long by default and includes a mix of uppercase letters, lowercase letters, numbers, and symbols. This complexity is customizable through environmental variables.
+
+2. **Local Administrator Account Management**:
+   - If the specified local administrator account exists, the script updates its password with the newly generated one.
+   - If the account does not exist, the script creates it with the generated password and adds it to the local Administrators group.
+   - It ensures that the password for this account never expires and that the account is enabled.
+
+3. **Security and Logging**:
+   - The script sets the account description to include the last password rotation date for tracking purposes.
+   - It can optionally write the username, new password, and the password set date to a User-Defined Field (UDF) in the Datto RMM dashboard for administrative purposes. This is controlled by an environmental variable (`$env:usrUDF`).
+
+4. **Error Handling**: The script includes basic error handling to catch specific exceptions, such as when the user is not found or other unspecified errors occur. It advises running the script with administrative privileges to avoid permission issues.
+
+5. **Environmental Variables**: The script uses several environmental variables to allow customization without modifying the script directly. These include variables for the local admin username (`$env:LAUserName`), password length (`$env:Length`), character sets to include in the password (`$env:Sets`), and the UDF index for storing the password in Datto RMM (`$env:usrUDF`).
+
+6. **Registry Modification**: For environments utilizing Datto RMM, it updates a registry key with the new password information, ensuring that this critical data can be securely accessed and managed from the Datto RMM dashboard.
+
+This script is a powerful tool for IT administrators looking to automate the rotation of local administrator passwords across their managed devices, enhancing security by ensuring that these critical accounts are not left with default or easily guessable passwords.
+
+
 Script to run on each machine that needs to have it's local admin password rotated, and create the specified local admin account if it does not exist.
 Each time the script runs it will check for the Local Admin account and generate a password. Specify the interval of running by your RMM or trigger it manually.
 Password will print into StdOut as well as your specified UDF (Datto RMM). Each password will be a randomly generated 25 character length, mixed and contain a variation of letters, symbols and numbers. 

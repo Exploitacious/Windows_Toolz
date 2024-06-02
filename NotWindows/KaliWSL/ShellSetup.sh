@@ -113,7 +113,8 @@ sudo apt install -y \
     pipx \
     Kali-win-kex \
     fzf \
-    brave-browser
+    brave-browser \
+    ffmpeg
 
 ## Establish pbcopy and pbpaste
 # Function to install xclip
