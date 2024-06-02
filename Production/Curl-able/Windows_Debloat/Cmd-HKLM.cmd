@@ -402,27 +402,27 @@ REM REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows\AppPrivacy" /V "LetAppsAcc
 REM REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Windows\AppPrivacy" /V "LetAppsAccessCamera_UserInControlOfTheseApps" /T "REG_MULTI_SZ" /D "
 
 REM: Tutorial: https://www.joseespitia.com/2019/07/24/registry-keys-for-windows-10-application-privacy-settings/
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\appDiagnostics" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\appointments" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\bluetoothSync" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\broadFileSystemAccess" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\chat" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\contacts" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\documentsLibrary" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\downloadsFolder" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\email" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\musicLibrary" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\phoneCall" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\phoneCallHistory" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\picturesLibrary" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\radios" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\userAccountInformation" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\userDataTasks" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\videosLibrary" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\gazeInput" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\graphicsCaptureProgrammatic" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
-REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\graphicsCaptureWithoutBorder" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\appDiagnostics" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\appointments" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\bluetoothSync" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\broadFileSystemAccess" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\chat" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\contacts" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\documentsLibrary" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\downloadsFolder" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\email" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\musicLibrary" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\phoneCall" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\phoneCallHistory" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\picturesLibrary" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\radios" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\userAccountInformation" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\userDataTasks" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\videosLibrary" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\gazeInput" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\graphicsCaptureProgrammatic" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
+REM REG ADD "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\graphicsCaptureWithoutBorder" /V "Value" /T "REG_SZ" /D "Deny" /F 1>NUL
 
 REM Tutorial: https://www.elevenforum.com/t/reset-and-clear-pinned-items-on-taskbar-in-windows-11.3634/
 DEL /F /S /Q /A "%AppData%\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\*"
