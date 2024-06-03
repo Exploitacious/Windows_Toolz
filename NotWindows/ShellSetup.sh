@@ -162,32 +162,31 @@ install_nordvpn() {
 # Function to clone and install additional configuration or dotfiles from a repository (optional)
 clone_and_install_dotfiles() {
 
-    # URL of the .zshrc file on GitHub
-    GITHUB_URL="https://raw.githubusercontent.com/yourusername/yourrepository/main/.zshrc"
+  # URL of the .zshrc file on GitHub
+  Zshrc_URL="https://github.com/Exploitacious/Windows_Toolz/blob/main/NotWindows/dotFiles/.zshrc"
 
-# Paths to place the .zshrc file
-ROOT_DIR="/root/.zshrc"
-USER_DIR="/home/yourdefaultuser/.zshrc"
+  # Paths to place the .zshrc file
+  ROOT_DIR="/root/.zshrc"
+  USER_DIR="/home/$DEFAULT_USER/.zshrc"
 
-# Download the .zshrc file and place it in root directory
-curl -o $ROOT_DIR $GITHUB_URL
+  # Download the .zshrc file and place it in root directory
+  curl -o $ROOT_DIR $Zshrc_URL
 
-# Download the .zshrc file and place it in the default user's directory
-curl -o $USER_DIR $GITHUB_URL
+  # Download the .zshrc file and place it in the default user's directory
+  curl -o $USER_DIR $Zshrc_URL
 
-# Change ownership of the .zshrc file in the default user's directory
-chown yourdefaultuser:yourdefaultuser $USER_DIR
+  # Change ownership of the .zshrc file in the default user's directory
+  chown $DEFAULT_USER:$DEFAULT_USER $USER_DIR
 
-echo ".zshrc file has been downloaded and placed in both directories."
+  echo ".zshrc file has been downloaded and placed in both directories."
 
-  
-  
-  # Uncomment and modify the lines below to fit your repository
-  # git clone https://github.com/yourusername/dotfiles.git ~/dotfiles
-  # cp ~/dotfiles/.zshrc ~/.zshrc
-
-  # Apply changes by sourcing .zshrc and switching to new zsh shell (optional)
 }
+
+
+
+
+
+####################################
 
 # Main script execution starts here
 
