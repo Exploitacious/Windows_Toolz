@@ -1,8 +1,10 @@
 #!/bin/bash
-# Script to set up Kali in WSL environment on a clean install
+# Script to set up Kali in WSL environment on a clean install or existing installation
 
 # Define color for output messages
 GREEN='\033[0;32m'
+RED='\033[0;31m'
+RESET='\033[0m'
 
 # Function to install necessary keys and update repositories
 install_keys_and_update_repos() {
@@ -80,8 +82,12 @@ install_oh_my_zsh() {
 # Function to set Zsh as the default shell for a user
 set_zsh_as_default_shell() {
   local user=$1
-  echo "Setting Zsh as the default shell for $user..."
-  sudo chsh -s $(which zsh) $user
+  if [[ $(getent passwd $user | cut -d: -f7) != $(which zsh) ]]; then
+    echo "Setting Zsh as the default shell for $user..."
+    sudo chsh -s $(which zsh) $user
+  else
+    echo "Zsh is already the default shell for $user."
+  fi
 }
 
 # Function to update and upgrade the system
@@ -128,21 +134,27 @@ create_pbcopy_pbpaste() {
   local pbcopy_script="/usr/local/bin/pbcopy"
   local pbpaste_script="/usr/local/bin/pbpaste"
 
-  echo "Creating pbcopy script..."
-  sudo bash -c "cat > $pbcopy_script" << 'EOF'
+  if [ ! -f "$pbcopy_script" ]; then
+    echo "Creating pbcopy script..."
+    sudo bash -c "cat > $pbcopy_script" << 'EOF'
 #!/bin/bash
 xclip -selection clipboard
 EOF
+    sudo chmod +x $pbcopy_script
+  else
+    echo "pbcopy script already exists."
+  fi
 
-  sudo chmod +x $pbcopy_script
-
-  echo "Creating pbpaste script..."
-  sudo bash -c "cat > $pbpaste_script" << 'EOF'
+  if [ ! -f "$pbpaste_script" ]; then
+    echo "Creating pbpaste script..."
+    sudo bash -c "cat > $pbpaste_script" << 'EOF'
 #!/bin/bash
 xclip -selection clipboard -o
 EOF
-
-  sudo chmod +x $pbpaste_script
+    sudo chmod +x $pbpaste_script
+  else
+    echo "pbpaste script already exists."
+  fi
 
   echo -e "${GREEN} pbcopy and pbpaste installation complete!"
 }
@@ -156,35 +168,43 @@ clean_up_packages() {
 # Function to install NordVPN (optional)
 install_nordvpn() {
   echo "Installing NordVPN..."
-  sh <(curl -sSf https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/NotWindows/KaliWSL/InstallNordVPN.sh)
+  curl -sSf https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/NotWindows/InstallNordVPN.sh -o /tmp/nordvpn_install.sh
+  if [ -f /tmp/nordvpn_install.sh ]; then
+    sudo sh /tmp/nordvpn_install.sh || {
+      echo -e "${RED}NordVPN installation failed. Skipping.${RESET}"
+    }
+    rm /tmp/nordvpn_install.sh
+  else
+    echo -e "${RED}NordVPN installation script not found. Skipping.${RESET}"
+  fi
 }
 
 # Function to clone and install additional configuration or dotfiles from a repository (optional)
 clone_and_install_dotfiles() {
-
   # URL of the .zshrc file on GitHub
-  Zshrc_URL="https://github.com/Exploitacious/Windows_Toolz/blob/main/NotWindows/dotFiles/.zshrc"
+  Zshrc_URL="https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/NotWindows/dotFiles/.zshrc"
 
   # Paths to place the .zshrc file
   ROOT_DIR="/root/.zshrc"
   USER_DIR="/home/$DEFAULT_USER/.zshrc"
 
   # Download the .zshrc file and place it in root directory
-  curl -o $ROOT_DIR $Zshrc_URL
+  sudo curl -o $ROOT_DIR $Zshrc_URL || {
+    echo -e "${RED}Failed to download .zshrc for root. Skipping.${RESET}"
+  }
 
   # Download the .zshrc file and place it in the default user's directory
-  curl -o $USER_DIR $Zshrc_URL
-
-  # Change ownership of the .zshrc file in the default user's directory
-  chown $DEFAULT_USER:$DEFAULT_USER $USER_DIR
+  if [ ! -f "$USER_DIR" ]; then
+    sudo curl -o $USER_DIR $Zshrc_URL || {
+      echo -e "${RED}Failed to download .zshrc for user. Skipping.${RESET}"
+    }
+    sudo chown $DEFAULT_USER:$DEFAULT_USER $USER_DIR
+  else
+    echo ".zshrc already exists in user's directory."
+  fi
 
   echo ".zshrc file has been downloaded and placed in both directories."
-
 }
-
-
-
-
 
 ####################################
 
@@ -209,12 +229,10 @@ fi
 
 install_oh_my_zsh $DEFAULT_USER || {
   echo "Oh My Zsh installation failed for $DEFAULT_USER"
-  exit 1
 }
 
 install_oh_my_zsh root || {
   echo "Oh My Zsh installation failed for root"
-  exit 1
 }
 
 set_zsh_as_default_shell $DEFAULT_USER
@@ -239,11 +257,3 @@ install_nordvpn
 clone_and_install_dotfiles
 
 echo -e "${GREEN} End of Script"
-```
-
-### Explanation:
-# 1. **Modular Functions**: The script is divided into functions, each responsible for a specific task. This makes it easier to read, maintain, and debug.
-# 2. **Comments**: Detailed comments are added before each function and significant code block to explain what it does.
-# 3. **Error Handling**: Basic error handling is included, especially in functions that perform critical tasks like installing software.
-# 4. **Color Output**: The use of color in output messages helps in distinguishing different stages of the script execution.
-# 5. **Optional Sections**: Some sections are marked as optional, such as installing NordVPN or cloning dotfiles, which can be uncommented and customized as needed.

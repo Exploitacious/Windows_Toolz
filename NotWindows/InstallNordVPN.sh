@@ -39,19 +39,6 @@ check_error "Failed to unzip NordVPN OpenVPN configuration files"
 # Clean up
 rm ovpn.zip
 
-# Create credentials file
-echo "Please enter your NordVPN (manual setup) Service credentials:"
-read -p "Username: " NORDVPN_USERNAME
-read -sp "Password: " NORDVPN_PASSWORD
-echo
-
-echo -e "$NORDVPN_USERNAME\n$NORDVPN_PASSWORD" > "$CREDENTIALS_FILE"
-check_error "Failed to create credentials file"
-
-# Restrict permissions on the credentials file
-chmod 600 "$CREDENTIALS_FILE"
-check_error "Failed to set permissions on credentials file"
-
 # Modify all configuration files to use the credentials file
 for CONFIG_FILE in "$NORDVPN_CONFIG_DIR"/ovpn_udp/*.ovpn; do
     if ! grep -q "auth-user-pass $CREDENTIALS_FILE" "$CONFIG_FILE"; then
@@ -86,8 +73,14 @@ fi
 
 # Check if credentials file exists
 if [ ! -f "$USER_HOME/nordvpn-configs/vpn-credentials.txt" ]; then
-    echo "Error: Credentials file $USER_HOME/nordvpn-configs/vpn-credentials.txt does not exist."
-    exit 1
+    echo "Please enter your NordVPN (manual setup) Service credentials:"
+    read -p "Username: " NORDVPN_USERNAME
+    read -sp "Password: " NORDVPN_PASSWORD
+    echo
+    echo -e "$NORDVPN_USERNAME\n$NORDVPN_PASSWORD" > "$USER_HOME/nordvpn-configs/vpn-credentials.txt"
+    check_error "Failed to create credentials file"
+    chmod 600 "$USER_HOME/nordvpn-configs/vpn-credentials.txt"
+    check_error "Failed to set permissions on credentials file"
 fi
 
 # List available configuration files
@@ -130,4 +123,4 @@ else
     echo "Alias 'connectnord' already exists in ~/.zshrc"
 fi
 
-echo  -e "${GREEN} Installation complete. Use 'connectnord' to connect to NordVPN "
+echo -e "${GREEN} Installation complete. Use 'connectnord' to connect to NordVPN"
