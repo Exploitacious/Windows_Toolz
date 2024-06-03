@@ -6,8 +6,6 @@ NORDVPN_OVPN_URL="https://downloads.nordcdn.com/configs/archives/servers/ovpn.zi
 CREDENTIALS_FILE="$NORDVPN_CONFIG_DIR/vpn-credentials.txt"
 CONNECTION_SCRIPT="/usr/local/bin/launch_nordvpn"
 ALIAS_COMMAND="alias connectnord='sudo /usr/local/bin/launch_nordvpn'"
-# Colors
-GREEN='\033[0;32m'
 
 # Function to check for errors
 check_error() {
@@ -39,13 +37,6 @@ check_error "Failed to unzip NordVPN OpenVPN configuration files"
 # Clean up
 rm ovpn.zip
 
-# Modify all configuration files to use the credentials file
-for CONFIG_FILE in "$NORDVPN_CONFIG_DIR"/ovpn_udp/*.ovpn; do
-    if ! grep -q "auth-user-pass $CREDENTIALS_FILE" "$CONFIG_FILE"; then
-        echo "auth-user-pass $CREDENTIALS_FILE" >> "$CONFIG_FILE"
-    fi
-done
-
 # Create the connection script
 cat << 'EOF' > launch_nordvpn.sh
 #!/bin/bash
@@ -71,16 +62,33 @@ if [ ! -d "$USER_HOME/nordvpn-configs/ovpn_udp/" ]; then
     exit 1
 fi
 
-# Check if credentials file exists
-if [ ! -f "$USER_HOME/nordvpn-configs/vpn-credentials.txt" ]; then
-    echo "Please enter your NordVPN (manual setup) Service credentials:"
+# Create credentials file if it doesn't exist
+if [ ! -f "$CREDENTIALS_FILE" ]; then
+    echo "Please enter your NordVPN credentials:"
     read -p "Username: " NORDVPN_USERNAME
     read -sp "Password: " NORDVPN_PASSWORD
     echo
-    echo -e "$NORDVPN_USERNAME\n$NORDVPN_PASSWORD" > "$USER_HOME/nordvpn-configs/vpn-credentials.txt"
+
+    echo -e "$NORDVPN_USERNAME\n$NORDVPN_PASSWORD" > "$CREDENTIALS_FILE"
     check_error "Failed to create credentials file"
-    chmod 600 "$USER_HOME/nordvpn-configs/vpn-credentials.txt"
+
+    # Restrict permissions on the credentials file
+    chmod 600 "$CREDENTIALS_FILE"
     check_error "Failed to set permissions on credentials file"
+
+    # Modify all configuration files to use the credentials file and update cipher settings
+    for CONFIG_FILE in "$NORDVPN_CONFIG_DIR"/*.ovpn; do
+        if ! grep -q "auth-user-pass $CREDENTIALS_FILE" "$CONFIG_FILE"; then
+            echo "auth-user-pass $CREDENTIALS_FILE" >> "$CONFIG_FILE"
+        fi
+        # Ensure the deprecated --cipher warning is addressed
+        if grep -q "cipher AES-256-CBC" "$CONFIG_FILE"; then
+            sed -i '/cipher AES-256-CBC/d' "$CONFIG_FILE"
+            if ! grep -q "data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305" "$CONFIG_FILE"; then
+                echo "data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305" >> "$CONFIG_FILE"
+            fi
+        fi
+    done
 fi
 
 # List available configuration files
@@ -123,4 +131,4 @@ else
     echo "Alias 'connectnord' already exists in ~/.zshrc"
 fi
 
-echo -e "${GREEN} Installation complete. Use 'connectnord' to connect to NordVPN"
+echo "Installation complete. Use 'connectnord' to connect to NordVPN after switching to Zsh."

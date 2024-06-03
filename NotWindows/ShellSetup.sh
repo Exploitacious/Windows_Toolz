@@ -17,7 +17,7 @@ install_keys_and_update_repos() {
 # Function to hold any broken packages
 hold_broken_packages() {
   echo "Holding broken packages..."
-  echo libc6:amd64 hold | sudo dpkg --set-selections
+  # echo libc6:amd64 hold | sudo dpkg --set-selections
   # To undo: echo libc6:amd64 install | sudo dpkg --set-selections
 }
 
