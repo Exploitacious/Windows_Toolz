@@ -2,6 +2,9 @@
 Write-Host -ForegroundColor Green "Install Winget, Winget Auto-Update, and required apps"
 Start-Sleep 3
 
+Read-Host -Prompt "Finished! Press Enter to exit"
+
+<#
 # Verify/Elevate Admin Session.
 if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
@@ -57,3 +60,5 @@ Foreach ($NewApp in $InstallPrograms) {
 }
 
 Read-Host -Prompt "Finished! Press Enter to exit"
+
+#>
