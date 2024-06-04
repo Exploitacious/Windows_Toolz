@@ -24,23 +24,23 @@
 
     :: List of files to download
     echo Downloading Files...
-    set files=(
-        Cmd-HKCU.cmd
-        Cmd-HKLM.cmd
-        FirstLogon.bat
-        InstallNewApps.ps1
-        PS-HKCU.ps1
-        PS-HKLM.ps1
-        PSandWindowsUpdates.ps1
-        UninstallBloat.ps1
-        Main-Stager.ps1
-    )
 
     :: Base URL for downloading files
     set baseURL=https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/
+
     :: Loop through each file and download it using PowerShell
-    for %%f in %files% do (
-        PowerShell -ExecutionPolicy Bypass -Command "(New-Object Net.WebClient).DownloadFile('%baseURL%%%f''%%f', '%%f')"
+    for %%f in (
+        "Cmd-HKCU.cmd"
+        "Cmd-HKLM.cmd"
+        "FirstLogon.bat"
+        "InstallNewApps.ps1"
+        "PS-HKCU.ps1"
+        "PS-HKLM.ps1"
+        "PSandWindowsUpdates.ps1"
+        "UninstallBloat.ps1"
+        "Main-Stager.ps1"
+    ) do (
+        PowerShell -NoProfile -ExecutionPolicy Bypass -Command "(New-Object Net.WebClient).DownloadFile('%baseURL%%%~f', '%%~f')"
     )
 
 :: Function to run the main debloat script

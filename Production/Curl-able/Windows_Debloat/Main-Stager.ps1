@@ -24,37 +24,22 @@ Write-Host
 
 
 Write-Host "Launching De-Bloat Processes..."
-Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"C:\Temp\Cleanup\UninstallBloat.ps1`"" -Verb RunAs
+# Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"C:\Temp\Cleanup\UninstallBloat.ps1`"" -Verb RunAs
 
-$i = 5 #Seconds
-do {
-    Write-Host $i
-    Sleep 1
-    $i--
-} while ($i -gt 0)
+Sleep 5
 
 Write-Host "Launching PS Modules & Windows Updates"
-Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"C:\Temp\Cleanup\PSandWindowsUpdates.ps1`"" -Verb RunAs
+# Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"C:\Temp\Cleanup\PSandWindowsUpdates.ps1`"" -Verb RunAs
 
-$i = 180 #Seconds
-do {
-    Write-Host $i
-    Sleep 1
-    $i--
-} while ($i -gt 0)
+sleep 5
 
 Write-Host "Launching Winget Auto Update and New App Installations"
 Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"C:\Temp\Cleanup\Windows_Toolz\InstallNewApps.ps1`"" -Verb RunAs
 
-$i = 60 #Seconds
-do {
-    Write-Host $i
-    Sleep 1
-    $i--
-} while ($i -gt 0)
+sleep 5
 
 Write-Host "Launching Windows tweaks and settings..."
-Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"C:\Temp\Cleanup\PS-HKLM.ps1`"" -Verb RunAs
+# Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"C:\Temp\Cleanup\PS-HKLM.ps1`"" -Verb RunAs
 
 
 Read-Host -Prompt "Finished! Press Enter to exit"
