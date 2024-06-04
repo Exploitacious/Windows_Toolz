@@ -25,15 +25,15 @@
     :: List of files to download
     echo Downloading Files...
     set files=(
-        "Cmd-HKCU.cmd"
-        "Cmd-HKLM.cmd"
-        "FirstLogon.bat"
-        "InstallNewApps.ps1"
-        "PS-HKCU.ps1"
-        "PS-HKLM.ps1"
-        "PSandWindowsUpdates.ps1"
-        "UninstallBloat.ps1"
-        "Main-Stager.ps1"
+        Cmd-HKCU.cmd
+        Cmd-HKLM.cmd
+        FirstLogon.bat
+        InstallNewApps.ps1
+        PS-HKCU.ps1
+        PS-HKLM.ps1
+        PSandWindowsUpdates.ps1
+        UninstallBloat.ps1
+        Main-Stager.ps1
     )
 
     :: Base URL for downloading files
