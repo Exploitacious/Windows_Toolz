@@ -1,44 +1,55 @@
-:: Download and run the system debloat scripts directly from GitHub
+@echo off
+:: Script to download and run system debloat scripts from GitHub
 :: Created by: Alex Ivantsov @Exploitacious
 
-@echo off
-:: Checking for Administrator elevation.
-        
-        openfiles>nul 2>&1
-        if %errorlevel% EQU 0 goto :Download
-        echo.
-        echo.
-        echo.
-        echo.
+:: Function to check for Administrator elevation
+:CheckAdmin
+    openfiles >nul 2>&1
+    if %errorlevel% EQU 0 (
+        goto :Download
+    ) else (
         echo.
         echo.    You are not running as Administrator.
-        echo.    This script cannot do it's job without elevation.
-        echo.
-        echo.    You need run this tool as Administrator.
-        echo.
-    exit
+        echo.    This script cannot do its job without elevation.
+        echo.    Please run this tool as Administrator.
+        exit /b
+    )
 
-:: Download Required Files from https://github.com/https://github.com/Exploitacious/Windows_Toolz/tree/main/Production/Curl-able/Windows_Debloat
+:: Function to download required files from GitHub
 :Download
-
-    PowerShell -Command "mkdir C:\Temp\Cleanup -erroraction silentlycontinue"
+    :: Create a temporary directory for cleanup scripts
+    echo Creating temporary directories in C:\Temp\Cleanup
+    PowerShell -Command "mkdir C:\Temp\Cleanup -ErrorAction SilentlyContinue"
     cd "C:\Temp\Cleanup"
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/Cmd-HKCU.cmd', 'Cmd-HKCU.cmd')"
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/Cmd-HKLM.cmd', 'Cmd-HKLM.cmd')"
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/FirstLogon.bat', 'FirstLogon.bat')"
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/InstallNewApps.ps1', 'InstallNewApps.ps1')"
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/PS-HKCU.ps1', 'PS-HKCU.ps1')"
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/PS-HKLM.ps1', 'PS-HKLM.ps1')"
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/PSandWindowsUpdates.ps1', 'PSandWindowsUpdates.ps1')"
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/UninstallBloat.ps1', 'UninstallBloat.ps1')"
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/Main-Stager.ps1', 'Main-Stager.ps1')"
 
+    :: List of files to download
+    echo Downloading Files...
+    set files=(
+        "Cmd-HKCU.cmd"
+        "Cmd-HKLM.cmd"
+        "FirstLogon.bat"
+        "InstallNewApps.ps1"
+        "PS-HKCU.ps1"
+        "PS-HKLM.ps1"
+        "PSandWindowsUpdates.ps1"
+        "UninstallBloat.ps1"
+        "Main-Stager.ps1"
+    )
 
-:: Start Running the SYSTEM DEBLOAT scripts
-:RunScript
+    :: Base URL for downloading files
+    set baseURL=https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/
+    :: Loop through each file and download it using PowerShell
+    for %%f in %files% do (
+        PowerShell -ExecutionPolicy Bypass -Command "(New-Object Net.WebClient).DownloadFile('%baseURL%%%f', '%%f')"
+    )
 
+:: Function to run the main debloat script
+:RunPowerShell
     SET ThisScriptsDirectory=C:\Temp\Cleanup\
     SET PowerShellScriptPath=%ThisScriptsDirectory%Main-Stager.ps1
-    PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '%PowerShellScriptPath%'";
 
-:: Supply Arguments to the script on what to enable?
+    :: Execute the main PowerShell script
+    PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '%PowerShellScriptPath%'"
+
+:: Start the script by checking for admin privileges
+goto :CheckAdmin
