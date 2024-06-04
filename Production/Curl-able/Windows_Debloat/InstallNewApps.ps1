@@ -44,9 +44,9 @@ Remove-Item "$WAUPath\Romanitho*\"
 
 
 # Install Apps
-
+Write-Host "Installing Applications..."
 Foreach ($NewApp in $InstallPrograms) {
-    $listApp = winget list --exact -q $NewApp
+    $listApp = winget list --exact -q $NewApp --accept-source-agreements --accept-package-agreements
     if (![String]::Join("", $listApp).Contains($NewApp)) {
         Write-host -ForegroundColor Green "Installing: " $NewApp
         winget install -e -h --accept-source-agreements --accept-package-agreements --id $NewApp 
