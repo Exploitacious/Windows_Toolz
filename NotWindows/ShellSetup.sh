@@ -182,28 +182,45 @@ install_nordvpn() {
 # Function to clone and install additional configuration or dotfiles from a repository (optional)
 clone_and_install_dotfiles() {
   # URL of the .zshrc file on GitHub
-  Zshrc_URL="https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/NotWindows/dotFiles/.zshrc"
+  ZSHRC_URL="https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/NotWindows/dotFiles/.zshrc"
+  NEOFETCH_URL="https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/NotWindows/dotFiles/config.conf"
 
   # Paths to place the .zshrc file
-  ROOT_DIR="/root/.zshrc"
-  USER_DIR="/home/$DEFAULT_USER/.zshrc"
+  ROOT_ZSHRC_DIR="/root/.zshrc"
+  USER_ZSHRC_DIR="/home/$DEFAULT_USER/.zshrc"
+  
+  # Path to place the NeoFetch config file
+  USER_NEOFETCH_DIR="/home/$DEFAULT_USER/.config/neofetch/config.conf"
 
   # Download the .zshrc file and place it in root directory
-  sudo curl -o $ROOT_DIR $Zshrc_URL || {
+  sudo curl -o $ROOT_ZSHRC_DIR $ZSHRC_URL || {
     echo -e "${RED}Failed to download .zshrc for root. Skipping.${RESET}"
   }
 
   # Download the .zshrc file and place it in the default user's directory
-  if [ ! -f "$USER_DIR" ]; then
-    sudo curl -o $USER_DIR $Zshrc_URL || {
+  if [ ! -f "$USER_ZSHRC_DIR" ]; then
+    sudo curl -o $USER_ZSHRC_DIR $ZSHRC_URL || {
       echo -e "${RED}Failed to download .zshrc for user. Skipping.${RESET}"
     }
-    sudo chown $DEFAULT_USER:$DEFAULT_USER $USER_DIR
+    sudo chown $DEFAULT_USER:$DEFAULT_USER $USER_ZSHRC_DIR
   else
     echo ".zshrc already exists in user's directory."
   fi
 
+  # Create NeoFetch config directory if it doesn't exist
+  if [ ! -d "/home/$DEFAULT_USER/.config/neofetch" ]; then
+    sudo mkdir -p "/home/$DEFAULT_USER/.config/neofetch"
+    sudo chown -R $DEFAULT_USER:$DEFAULT_USER "/home/$DEFAULT_USER/.config"
+  fi
+
+  # Download the NeoFetch config file and place it in the default user's NeoFetch directory
+  sudo curl -o $USER_NEOFETCH_DIR $NEOFETCH_URL || {
+    echo -e "${RED}Failed to download NeoFetch config for user. Skipping.${RESET}"
+  }
+  sudo chown $DEFAULT_USER:$DEFAULT_USER $USER_NEOFETCH_DIR
+
   echo ".zshrc file has been downloaded and placed in both directories."
+  echo "NeoFetch config file has been downloaded and placed in the NeoFetch configuration directory."
 }
 
 ####################################

@@ -96,12 +96,30 @@ source $ZSH/oh-my-zsh.sh
 # users are encouraged to define aliases within the ZSH_CUSTOM folder.
 # For a full list of active aliases, run `alias`.
 #
+### Aliases
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
+#Shell
+alias c="clear"
+alias x="exit"
+alias e="code -n ~/ ~/.zshrc ~/.config/neofetch/config.conf" #ExtrasIfNeeded: ~/.aliases ~/.colors ~/.hooks
+alias r="source ~/.zshrc"
+alias h="history -10" # last 10 history commands
+alias hc="history -c" # clear history
+alias hg="history | grep " # +command
+alias ag="alias | grep " # +command
+alias sapu='sudo apt-get update'
+#Utilities
+alias connectnord='sudo /usr/local/bin/launch_nordvpn'
+alias desktop='kex --win -s'
+alias gcu="git config user.name \"Alex Ivantsov\" && git config user.email \"alex@ivantsov.tech\""
+alias myip='curl http://ipecho.net/plain; echo'
+alias distro='cat /etc/*-release'
 
 # Created by `pipx` on 2024-06-01 17:58:38
 export PATH="$PATH:/home/master/.local/bin"
-alias connectnord='sudo /usr/local/bin/launch_nordvpn'
-alias desktop='kex --win -s'
 if [ -f "/home/master/.config/fabric/fabric-bootstrap.inc" ]; then . "/home/master/.config/fabric/fabric-bootstrap.inc"; fi
+
+#Neofetch
+neofetch
