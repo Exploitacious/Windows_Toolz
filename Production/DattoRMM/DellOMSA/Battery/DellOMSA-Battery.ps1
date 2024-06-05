@@ -68,6 +68,8 @@ try {
 catch {
     $Global:DiagMsg += "Error running racadm command: $_"
     $Global:AlertMsg += "Error Occurred - Scrutinize Diagnostic Log"
+    $Global:DiagMsg += "Attempting to Restart iDRAC... if this continues happening, please check the server's iDRAC."
+    racadm racreset
 }
 
 if ($output -eq "") {
@@ -79,6 +81,8 @@ if ($output -eq "") {
 elseif ($output -match "ERROR") {
     $Global:DiagMsg += "RACADM returned an error: $output"
     $Global:AlertMsg += "Error Occurred - Scrutinize Diagnostic Log"
+    $Global:DiagMsg += "Attempting to Restart iDRAC... if this continues happening, please check the server's iDRAC."
+    racadm racreset
 }
 else {
     $Global:DiagMsg += "Parsing racadm output..."
