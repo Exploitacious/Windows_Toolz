@@ -52,7 +52,7 @@ $Global:DiagMsg = @() # Running Diagnostic log (diaglog). Use " $Global:DiagMsg 
 $Global:AlertMsg = @() # Combined Alert message. If left blank, will not trigger Alert status. Use " $Global:AlertMsg += " to append messages to be alerted on in Datto.
 $Global:varUDFString = @() # String which will be written to UDF, if UDF Number is defined by $usrUDF in Datto. Use " $Global:varUDFString += " to fill this string.
 $ScriptUID = GenRANDString 15 UN # Generate random UID for script
-$Date = get-date -Format "MM/dd/yyy HH:mm tt"
+$Date = get-date -Format "MM/dd/yyy hh:mm tt"
 $System = Get-WmiObject WIN32_ComputerSystem  
 #$OS = Get-CimInstance WIN32_OperatingSystem 
 #$Core = Get-WmiObject win32_processor 
