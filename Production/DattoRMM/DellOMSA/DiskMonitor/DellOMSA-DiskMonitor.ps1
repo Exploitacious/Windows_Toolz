@@ -49,7 +49,7 @@ $System = Get-WmiObject WIN32_ComputerSystem
 #$Core = Get-WmiObject win32_processor 
 #$GPU = Get-WmiObject WIN32_VideoController  
 #$Disk = get-WmiObject win32_logicaldisk
-$Global:AlertHealthy = "$Global:totalDisks Physical Disks Fully Operational : Last Checked $Date" # Define what should be displayed in Datto when monitor is healthy and $Global:AlertMsg is blank.
+$Global:AlertHealthy = "Physical Disks Fully Operational | Last Checked $Date" # Define what should be displayed in Datto when monitor is healthy and $Global:AlertMsg is blank.
 ### $APIEndpoint = "https://prod-36.westus.logic.azure.com:443/workflows/6c032a1ca84045b9a7a1436864ecf696/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=c-dVa333HMzhWli_Fp_4IIAqaJOMwFjP2y5Zfv4j_zA"
 $Global:DiagMsg += "Script UID: " + $ScriptUID
 # Verify/Elevate Admin Session. Comment out if not needed.
@@ -117,7 +117,7 @@ else {
         $Global:DiagMsg += "No disks found."
     }
     else {
-        $Global:DiagMsg += "Total disks: $Global:totalDisks"
+        $Global:DiagMsg += "Total Physical Disks Found: $Global:totalDisks"
     }
 }
 
@@ -209,7 +209,7 @@ else {
         Invoke-WebRequest -Uri $APIEndpoint -Method POST -Body ($InfoHashTable | ConvertTo-Json) -ContentType "application/json"
     }
     # If the AlertMsg variable is blank (nothing was added), the script will report healthy status with whatever was defined above.
-    write-DRMMAlert $Global:AlertHealthy
+    write-DRMMAlert "$Global:totalDisks $Global:AlertHealthy"
     write-DRMMDiag $Global:DiagMsg
 
     # Exit 0 means all is well. No Alert.
