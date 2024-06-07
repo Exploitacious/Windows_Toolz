@@ -20,7 +20,7 @@ function write-DRMMDiag ($messages) {
 }
 function write-DRMMAlert ($message) {
     Write-Host '<-Start Result->'
-    Write-Host "$message"
+    Write-Host "STATUS=$message"
     Write-Host '<-End Result->'
 }
 

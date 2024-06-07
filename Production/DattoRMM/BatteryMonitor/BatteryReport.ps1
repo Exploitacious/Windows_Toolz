@@ -1,4 +1,4 @@
-## Battery Monitoring Script
+## Laptop Battery Monitoring Script
 # Created by Alex Ivantsov @Exploitacious
 
 <#
@@ -14,7 +14,7 @@ function write-DRMMDiag ($messages) {
 }
 function write-DRMMAlert ($message) {
     Write-Host '<-Start Result->'
-    Write-Host "$message"
+    Write-Host "STATUS=$message"
     Write-Host '<-End Result->'
 }
 Function GenRANDString ([Int]$CharLength, [Char[]]$CharSets = "ULNS") {
@@ -130,7 +130,7 @@ $Global:DiagMsg += "Lifetime Recharge Cycle Count: $cycleCount"
 
 
 if ($cycleCount -gt $env:cycleCountThresh -or $degradationPercentage -gt $env:degradeThresh) {
-    $Global:AlertMsg += "Battery Health reporting NOT OK. Scrutinize diagnostic log."
+    $Global:AlertMsg += "Battery Health NOT OK. Scrutinize diagnostic log."
     $Global:DiagMsg += "Battery Health has surpassed the set limits of:"
     $Global:DiagMsg += "- $env:cycleCountThresh total recharge cycles ($cycleCount) ;or;"
     $Global:DiagMsg += "- degraded beyond $env:degradeThresh % ($degradationPercentage %)"
@@ -225,7 +225,7 @@ else {
         Invoke-WebRequest -Uri $APIEndpoint -Method POST -Body ($InfoHashTable | ConvertTo-Json) -ContentType "application/json"
     }
     # If the AlertMsg variable is blank (nothing was added), the script will report healthy status with whatever was defined above.
-    write-DRMMAlert "Overall Battery Health $remainingPercentage %  with $cycleCount Total Recharge Cycles $Global:AlertHealthy"
+    write-DRMMAlert "Battery is $remainingPercentage % of Original Capacity with $cycleCount Total Recharge Cycles $Global:AlertHealthy"
     write-DRMMDiag $Global:DiagMsg
 
     # Exit 0 means all is well. No Alert.
