@@ -28,6 +28,7 @@ clean_system() {
   sudo apt-get clean
   sudo dpkg --configure -a
   sudo apt install -f
+  for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
 }
 
 # Function to enable experimental repositories using kali-tweaks
@@ -109,7 +110,8 @@ install_additional_packages() {
     kali-win-kex \
     fzf \
     brave-browser \
-    ffmpeg
+    ffmpeg \
+    nmap
 }
 
 # Function to install xclip if not already installed
@@ -157,6 +159,59 @@ EOF
   fi
 
   echo -e "${GREEN} pbcopy and pbpaste installation complete!"
+}
+
+# Install Docker
+install_docker() {
+  # Add Docker's official GPG key:
+
+# Update your existing list of packages
+echo "Updating package list..."
+sudo apt update
+
+# Install prerequisites
+echo "Installing prerequisites..."
+sudo apt install -y apt-transport-https ca-certificates curl software-properties-common gnupg2
+
+# Add Docker’s official GPG key
+echo "Adding Docker's official GPG key..."
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Set up the Docker stable repository for Debian
+echo "Setting up the Docker stable repository..."
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian buster stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Update the package database with Docker packages from the newly added repo
+echo "Updating package database with Docker packages..."
+sudo apt update
+
+# Install Docker
+echo "Installing Docker..."
+sudo apt install -y docker-ce docker-ce-cli containerd.io
+
+# Add your user to the Docker group
+echo "Adding user to Docker group..."
+sudo groupadd docker
+sudo usermod -aG docker $USER
+
+# Start Docker service
+echo "Starting Docker service..."
+sudo service docker start
+
+# Verify Docker installation
+echo "Verifying Docker installation..."
+docker --version
+
+echo "Docker installation completed successfully!"
+echo "You may need to restart your terminal or log out and log back in to apply the group changes."
+
+
+# Add the repository to Apt sources:
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
 }
 
 # Function to clean up unnecessary packages
@@ -270,6 +325,8 @@ create_pbcopy_pbpaste
 clean_up_packages
 
 install_nordvpn
+
+install_docker
 
 clone_and_install_dotfiles
 

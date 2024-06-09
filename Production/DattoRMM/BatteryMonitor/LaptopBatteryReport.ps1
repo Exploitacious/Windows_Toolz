@@ -56,8 +56,8 @@ $System = Get-WmiObject WIN32_ComputerSystem
 
 # Define the path for the battery report
 $env:batteryReportPath = "C:\Temp\BatteryReport\Battery-Report.html"
-$env:cycleCountThresh = 200 # Alert if Battery is greater than this many cycles
-$env:degradeThresh = 50 # Percentage. Alert if battery degredation is beyond xx%
+$env:cycleCountThresh = 500 # Alert if Battery is greater than this many cycles
+$env:degradeThresh = 35 # Percentage. Alert if battery degredation is beyond xx%
 $env:usrUDF = 14 # UDF to write info to
 
 $Global:AlertHealthy = "| Last Measured $Date" # Define what should be displayed in Datto when monitor is healthy and $Global:AlertMsg is blank.
@@ -124,7 +124,7 @@ $batteryAgeYears = [math]::Round($batteryAgeDays / 365, 2)
 $Global:DiagMsg += "Battery Design Capacity: $designCapacity mWh"
 $Global:DiagMsg += "Current Max Charge Capacity: $fullChargeCapacity mWh"
 $Global:DiagMsg += "Estimated Battery Degradation: $degradationPercentage %"
-$Global:DiagMsg += "Estimated Remaining Battery: $remainingPercentage %"
+$Global:DiagMsg += "Max Battery Capacity: $remainingPercentage %"
 $Global:DiagMsg += "Estimated Battery Age based on BIOS: $batteryAgeYears years ($batteryAgeDays days)"
 $Global:DiagMsg += "Lifetime Recharge Cycle Count: $cycleCount"
 
