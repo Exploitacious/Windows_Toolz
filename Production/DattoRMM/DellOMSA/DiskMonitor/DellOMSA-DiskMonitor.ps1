@@ -58,7 +58,6 @@ $Global:DiagMsg += "Script UID: " + $ScriptUID
 ##################################
 ######## Start of Script #########
 
-
 # Initialize output variable and Disk Count
 $output = ""
 $Global:totalDisks = 0
@@ -107,9 +106,15 @@ else {
 
         $Global:DiagMsg += "$($disk.Name) $($disk.Size) - $($disk.Status) | S/N - $($disk.SerialNumber) | PredictiveFailure - $($disk.FailurePredicted)"
 
+        # Logic for SSDs with Warning status and no predictive failure - Likely they are only warning for being "foreign"
         if ($disk.Status -ne "Ok") {
-            $Global:AlertMsg += " Disk Status is NOT OK: " + $disk.Name
-            $Global:DiagMsg += "Disk Status is NOT OK: " + $disk.Name
+            if ($disk.Name -like "*Solid State Disk*" -and $disk.Status -eq "Warning" -and $disk.FailurePredicted -eq "NO") {
+                $Global:DiagMsg += "Ignored Warning status for: " + $disk.Name + " as no predictive failure is reported. "
+            }
+            else {
+                $Global:AlertMsg += " Disk Status is NOT OK: " + $disk.Name
+                $Global:DiagMsg += "Disk Status is NOT OK: " + $disk.Name
+            }
         }
     }
 
@@ -120,6 +125,7 @@ else {
         $Global:DiagMsg += "Total Physical Disks Found: $Global:totalDisks"
     }
 }
+
 
 #END
 
