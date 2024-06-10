@@ -103,19 +103,33 @@ Remove-Item "$WAUPath\Romanitho*\"
 
 $Global:DiagMsg += "Winget Auto-Update Installed."
 
+# Verify Winget
+$ResolveWingetPath = Resolve-Path "C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe"
+if ($ResolveWingetPath) {
+    $WingetPath = $ResolveWingetPath[-1].Path
+}
+else {
+    $Global:DiagMsg += "! ERROR: Unable to locate WinGet installation. Please install WinGet first."
+    write-host "! ERROR: Unable to locate WinGet installation. Please install WinGet first."
+    exit 1
+}
+
 # Install Required Apps
 $Global:DiagMsg += "Installing Applications..."
 Foreach ($NewApp in $InstallPrograms) {
+
     Write-Host
     Write-Host "Searching for $NewApp"
     $Global:DiagMsg += "Searching for " + $NewApp
 
     $listApp = winget list --exact -q $NewApp --accept-source-agreements --accept-package-agreements
+
     if (![String]::Join("", $listApp).Contains($NewApp)) {
         Write-Host "Verifying $NewApp"
         $Global:DiagMsg += "Verifying and Updating " + $NewApp
 
-        winget install -e -h --accept-source-agreements --accept-package-agreements --id $NewApp 
+        start-process "$ResolveWingetPath\winget.exe" -argumentlist "upgrade $NewApp" -Wait -NoNewWindow
+        #winget install -e -h --accept-source-agreements --accept-package-agreements --id $NewApp 
     }
     else {
         Write-Host "$NewApp already installed."
