@@ -1,17 +1,85 @@
-<#
- Install and Launch Winget Auto Update
-https://github.com/Romanitho/Winget-AutoUpdate/blob/main/Sources/WAU/Winget-AutoUpdate-Install.ps1
+# Winget Auto Update and App Compliance
+# Created by Alex Ivantsov @Exploitacious
 
-Staging and Deployment for Datto RMM established by Alex Ivantsov @Exploitacious 
+function write-DRMMDiag ($messages) {
+    Write-Host '<-Start Diagnostic->'
+    foreach ($Message in $Messages) { $Message + ' `' }
+    Write-Host '<-End Diagnostic->'
+}
+function write-DRMMAlert ($message) {
+    Write-Host '<-Start Result->'
+    Write-Host "STATUS=$message"
+    Write-Host '<-End Result->'
+}
+Function GenRANDString ([Int]$CharLength, [Char[]]$CharSets = "ULNS") {
+    
+    $Chars = @()
+    $TokenSet = @()
+    
+    If (!$TokenSets) {
+        $Global:TokenSets = @{
+            U = [Char[]]'ABCDEFGHIJKLMNOPQRSTUVWXYZ'                                # Upper case
+            L = [Char[]]'abcdefghijklmnopqrstuvwxyz'                                # Lower case
+            N = [Char[]]'0123456789'                                                # Numerals
+            S = [Char[]]'!"#%&()*+,-./:;<=>?@[\]^_{}~'                             # Symbols
+        }
+    }
 
-#>
+    $CharSets | ForEach-Object {
+        $Tokens = $TokenSets."$_" | ForEach-Object { If ($Exclude -cNotContains $_) { $_ } }
+        If ($Tokens) {
+            $TokensSet += $Tokens
+            If ($_ -cle [Char]"Z") { $Chars += $Tokens | Get-Random }             #Character sets defined in upper case are mandatory
+        }
+    }
+
+    While ($Chars.Count -lt $CharLength) { $Chars += $TokensSet | Get-Random }
+    ($Chars | Sort-Object { Get-Random }) -Join ""                                #Mix the (mandatory) characters and output string
+};
+# Extra Info and Variables
+$Global:DiagMsg = @() # Running Diagnostic log (diaglog). Use " $Global:DiagMsg += " to append messages to this log for verboseness in the script.
+$Global:AlertMsg = @() # Combined Alert message. If left blank, will not trigger Alert status. Use " $Global:AlertMsg += " to append messages to be alerted on in Datto.
+$Global:varUDFString = @() # String which will be written to UDF, if UDF Number is defined by $usrUDF in Datto. Use " $Global:varUDFString += " to fill this string.
+$ScriptUID = GenRANDString 15 UN # Generate random UID for script
+$Date = get-date -Format "MM/dd/yyy hh:mm tt"
+$System = Get-WmiObject WIN32_ComputerSystem  
+#$OS = Get-CimInstance WIN32_OperatingSystem 
+#$Core = Get-WmiObject win32_processor 
+#$GPU = Get-WmiObject WIN32_VideoController  
+#$Disk = get-WmiObject win32_logicaldisk
+$Global:AlertHealthy = "WinGetAutoUpdate | Initiated $Date" # Define what should be displayed in Datto when monitor is healthy and $Global:AlertMsg is blank.
+### $APIEndpoint = "https://prod-36.westus.logic.azure.com:443/workflows/6c032a1ca84045b9a7a1436864ecf696/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=c-dVa333HMzhWli_Fp_4IIAqaJOMwFjP2y5Zfv4j_zA"
+$Global:DiagMsg += "Script UID: " + $ScriptUID
+# Verify/Elevate Admin Session. Comment out if not needed.
+#### if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
+##################################
+##################################
+######## Start of Script #########
+
+
+# Apps to Install Requires WinGet to be installed, or the switch enabled for automatically installing WinGet
+$Global:DiagMsg += "Installing Winget, Winget Auto-Update, and required apps..."
+Start-Sleep 3
+
+# Verify/Elevate Admin Session.
+# if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
+
+$InstallPrograms = @(
+    "Company Portal"
+    "9N0DX20HK701" # Windows Terminal
+    "9NRX63209R7B" # Outlook (NEW) for Windows
+    "Adobe.Acrobat.Reader.64-bit"
+    "7zip.7zip"
+    "Zoom.Zoom"
+    "Microsoft.Teams" # Microsoft Teams (New)
+)
+
+# Install WinGet, Update Apps, and Install Specified Apps
 
 ### Refresh and Download the latest Winget Auto Update
-
 $WAUPath = "C:\Temp\WAU_Latest"
 $WAUurl = "https://github.com/Romanitho/Winget-AutoUpdate/zipball/master/"
 $WAUFile = "$WAUPath\WAU_latest.zip"
-
 # Refresh the directory to allow download and install of latest version
 if ((Test-Path -Path $WAUPath)) {
     Remove-Item $WAUPath -Recurse -Force -ErrorAction SilentlyContinue
@@ -20,7 +88,6 @@ if ((Test-Path -Path $WAUPath)) {
 else {
     New-Item -ItemType Directory -Path $WAUPath
 }
-
 
 # Download Winget AutoUpdate
 Invoke-WebRequest -Uri $WAUurl -o $WAUFile
@@ -31,103 +98,125 @@ Remove-Item $WAUFile -Force
 Move-Item "$WAUPath\Romanitho*\*" $WAUPath
 Remove-Item "$WAUPath\Romanitho*\"
 
+### Execute Winget + Auto Update Installation
+# & "$WAUPath\Sources\WAU\Winget-AutoUpdate-Install.ps1" -Silent -InstallUserContext -NotificationLevel None -UpdatesAtLogon -UpdatesInterval Daily -DoNotUpdate
 
-### Execute Winget Auto Update Installation
-& "$WAUPath\Sources\WAU\Winget-AutoUpdate-Install.ps1" -Silent -InstallUserContext -NotificationLevel None -UpdatesAtLogon -UpdatesInterval Weekly -StartMenuShortcut -DoNotUpdate
+$Global:DiagMsg += "Winget Auto-Update Installed."
 
-<# Options for WAU Installation (from https://github.com/Romanitho/Winget-AutoUpdate)
+# Install Required Apps
+$Global:DiagMsg += "Installing Applications..."
+Foreach ($NewApp in $InstallPrograms) {
+    Write-Host
+    Write-Host "Searching for $NewApp"
+    $Global:DiagMsg += "Searching for " + $NewApp
 
--Silent
-Install Winget-AutoUpdate and prerequisites silently.
+    $listApp = winget list --exact -q $NewApp --accept-source-agreements --accept-package-agreements
+    if (![String]::Join("", $listApp).Contains($NewApp)) {
+        Write-Host "Verifying $NewApp"
+        $Global:DiagMsg += "Verifying and Updating " + $NewApp
 
--DoNotUpdate
-Do not run Winget-AutoUpdate after installation. By default, Winget-AutoUpdate is run just after installation.
+        winget install -e -h --accept-source-agreements --accept-package-agreements --id $NewApp 
+    }
+    else {
+        Write-Host "$NewApp already installed."
+        $Global:DiagMsg += $NewApp + " - already installed."
+    }
+}
 
--DisableWAUAutoUpdate
-Disable Winget-AutoUpdate update checking. By default, WAU auto updates if new version is available on Github.
+Write-Host "Finished! Press Enter to exit"
+$Global:DiagMsg += "Finished! Press Enter to exit"
+Write-Host
+Write-Host
 
--UseWhiteList
-Use White List instead of Black List. This setting will not create the "excluded_apps.txt" but "included_apps.txt".
+######## End of Script #########
+##################################
+##################################
+### Write to UDF if usrUDF (Write To) Number is defined. (Optional)
+if ($env:usrUDF -ge 1) {    
+    if ($Global:varUDFString.length -gt 255) {
+        # Write UDF to diaglog
+        $Global:DiagMsg += " - Writing to UDF: " + $Global:varUDFString 
+        # Limit UDF Entry to 255 Characters 
+        Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString.substring(0, 255)) -Force
+    }
+    else {
+        # Write to diagLog and UDF
+        $Global:DiagMsg += " - Writing to UDF: " + $Global:varUDFString 
+        Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString) -Force
+    }
+}
+else {
+    # Write to diaglog
+    # $Global:DiagMsg += " - not writing to UDF"
+}
+### Info sent to into JSON POST to API Endpoint (Optional)
+$InfoHashTable = @{
+    'CS_ACCOUNT_UID'  = $env:CS_ACCOUNT_UID
+    'CS_PROFILE_DESC' = $env:CS_PROFILE_DESC
+    'CS_PROFILE_NAME' = $env:CS_PROFILE_NAME
+    'CS_PROFILE_UID'  = $env:CS_PROFILE_UID
+    'Script_Diag'     = $Global:DiagMsg
+    'Script_UID'      = $ScriptUID
+    'Date_Time'       = $Date
+    'Comp_Model'      = $System.Model 
+    'Comp_Make'       = $System.Manufacturer 
+    'Comp_Hostname'   = $System.Name
+    'Comp_LastUser'   = $System.UserName
+    ########################################
+    #'CS_CC_HOST'            = $env:CS_CC_HOST
+    #'CS_CC_PORT1'           = $env:CS_CC_PORT1
+    #'CS_CSM_ADDRESS'        = $env:CS_CSM_ADDRESS
+    #'CS_DOMAIN'             = $env:CS_DOMAIN
+    #'CS_PROFILE_PROXY_TYPE' = $env:CS_PROFILE_PROXY_TYPE
+    #'CS_WS_ADDRESS'         = $env:CS_WS_ADDRESS
+    #'Local_Admin_PW'        = $env:UDF_1
+    #'Bitlocker_TPMStatus'   = $env:UDF_2
+    #'Windows_Activation'    = $env:UDF_3
+    #'DRMM_Agent_Health'     = $env:UDF_4
+    #'Patch_Policy_Status'   = $env:UDF_5
+    #'WU_Service_Health'     = $env:UDF_6
+    #'Ext_WU_Details'        = $env:UDF_7
+    #'Azure_AD_Status'       = $env:UDF_8
+    #'Windows_Keys_Found'    = $env:UDF_9
+    #'Office_Keys_Found'     = $env:UDF_10
+    #'Server_Roles'          = $env:UDF_11
+    #'Log4J_Detection'       = $env:UDF_12
+    #'TL_ComputerID'         = $env:UDF_13
+    #'Local_Admins_Present'  = $env:UDF_14
+    #'UDF_30'                = $env:UDF_30
+    #'Comp_CPU_Cores'        = $Core.NumberOfCores 
+    #'Comp_CPU_Model'        = $Core.Caption 
+    #'Comp_Ram'              = $System.TotalPhysicalMemory 
+    #'Comp_GPU'              = $GPU.Caption 
+    #'Comp_OSD'              = $OS.InstallDate 
+    #'Comp_OS'               = $OS.Caption 
+}
+### Exit script with proper Datto alerting, diagnostic and API Results.
+if ($Global:AlertMsg) {
+    # Add Script Result and POST to API if an Endpoint is Provided
+    if ($null -ne $APIEndpoint) {
+        $Global:DiagMsg += " - Sending Results to API"
+        $InfoHashTable.add("Script_Result", "$Global:AlertMsg")
+        Invoke-WebRequest -Uri $APIEndpoint -Method POST -Body ($InfoHashTable | ConvertTo-Json) -ContentType "application/json"
+    }
+    # If your AlertMsg has value, this is how it will get reported.
+    write-DRMMAlert $Global:AlertMsg
+    write-DRMMDiag $Global:DiagMsg
 
--ListPath
-Get Black/White List from external Path (URL/UNC/Local/GPO) - download/copy to Winget-AutoUpdate installation location if external list is newer.
-PATH must end with a Directory, not a File...
-...if the external Path is an URL and the web host doesn't respond with a date/time header for the file (i.e GitHub) then the file is always downloaded!
+    # Exit 1 means DISPLAY ALERT
+    Exit 1
+}
+else {
+    # Add Script Result and POST to API if an Endpoint is Provided
+    if ($null -ne $APIEndpoint) {
+        $Global:DiagMsg += " - Sending Results to API"
+        $InfoHashTable.add("Script_Result", "$Global:AlertHealthy")
+        Invoke-WebRequest -Uri $APIEndpoint -Method POST -Body ($InfoHashTable | ConvertTo-Json) -ContentType "application/json"
+    }
+    # If the AlertMsg variable is blank (nothing was added), the script will report healthy status with whatever was defined above.
+    write-DRMMAlert $Global:AlertHealthy
+    write-DRMMDiag $Global:DiagMsg
 
-If the external Path is a Private Azure Container protected by a SAS token (resourceURI?sasToken), every special character should be escaped at installation time.
-It doesn't work to call Powershell in CMD to install WAU with the parameter:
--ListPath https://storagesample.blob.core.windows.net/sample-container?v=2023-11-31&sr=b&sig=39Up9jzHkxhUIhFEjEh9594DIxe6cIRCgOVOICGSP%3A377&sp=rcw
-Instead you must escape every special character (notice the % escape too) like:
--ListPath https://storagesample.blob.core.windows.net/sample-container^?v=2023-11-31^&sr=b^&sig=39Up9jzHkxhUIhFEjEh9594DIxe6cIRCgOVOICGSP%%3A377^&sp=rcw
-
-If -ListPath is set to GPO the Black/White List can be managed from within the GPO itself under Application GPO Blacklist/Application GPO Whitelist. Thanks to Weatherlights in #256 (reply in thread)!
-
--ModsPath
-Get Mods from external Path (URL/UNC/Local/AzureBlob) - download/copy to mods in Winget-AutoUpdate installation location if external mods are newer.
-For URL: This requires a site directory with Directory Listing Enabled and no index page overriding the listing of files (or an index page with href listing of all the Mods to be downloaded):
-
-<ul>
-<li><a  href="Adobe.Acrobat.Reader.32-bit-installed.ps1">Adobe.Acrobat.Reader.32-bit-installed.ps1</a></li>
-<li><a  href="Adobe.Acrobat.Reader.64-bit-override.txt">Adobe.Acrobat.Reader.64-bit-override.txt</a></li>
-<li><a  href="Notepad++.Notepad++-installed.ps1">Notepad++.Notepad++-installed.ps1</a></li>
-<li><a  href="Notepad++.Notepad++-uninstalled.ps1">Notepad++.Notepad++-uninstalled.ps1</a></li>
-</ul>
-Validated on IIS/Apache.
-
-Nota bene IIS :
-
-The extension .ps1 must be added as MIME Types (text/powershell-script) otherwise it's displayed in the listing but can't be opened
-Files with special characters in the filename can't be opened by default from an IIS server - config must be administrated: Enable Allow double escaping in 'Request Filtering'
-For AzureBlob: This requires the parameter -AzureBlobURL to be set with an appropriate Azure Blob Storage URL including the SAS token. See -AzureBlobURL for more information.
-
--AzureBlobURL
-Used in conjunction with the -ModsPath parameter to provide the Azure Storage Blob URL with SAS token. The SAS token must, at a minimum, have 'Read' and 'List' permissions. It is recommended to set the permisions at the container level and rotate the SAS token on a regular basis. Ensure the container reflects the same structure as found under the initial mods folder.
-
--InstallUserContext
-Install WAU with system and user context executions.
-Applications installed in system context will be ignored under user context.
-
--BypassListForUsers
-Bypass Black/White list when run in user context.
-
--NoClean
-Keep critical files when installing/uninstalling. This setting will keep "excluded_apps.txt", "included_apps.txt", "mods" and "logs" as they were.
-
--DesktopShortcut
-Create a shortcut for user interaction on the Desktop to run task Winget-AutoUpdate
-
--StartMenuShortcut
-Create shortcuts for user interaction in the Start Menu to run task Winget-AutoUpdate, open Logs and Web Help.
-
--NotificationLevel
-Specify the Notification level: Full (Default, displays all notification), SuccessOnly (Only displays notification for success) or None (Does not show any popup).
-
--UpdatesAtLogon
-Set WAU to run at user logon.
-
--UpdatesInterval
-Specify the update frequency: Daily (Default), BiDaily, Weekly, BiWeekly, Monthly or Never. Can be set to 'Never' in combination with '-UpdatesAtLogon' for instance.
-
--UpdatesAtTime
-Specify the time of the update interval execution time. Default 6AM.
-
--RunOnMetered
-Force WAU to run on metered connections. May add cellular data costs on shared connexion from smartphone for example.
-
--MaxLogFiles
-Specify number of allowed log files.
-Default is 3 out of 0-99:
-Setting MaxLogFiles to 0 don't delete any old archived log files.
-Setting it to 1 keeps the original one and just let it grow.
-
--MaxLogSize
-Specify the size of the log file in bytes before rotating.
-Default is 1048576 = 1 MB (ca. 7500 lines)
-
--WAUinstallPath
-Specify Winget-AutoUpdate installation location. Default: C:\ProgramData\Winget-AutoUpdate (Recommended to leave default).
-
--Uninstall
-Remove scheduled tasks and scripts.
-
-#>
+    # Exit 0 means all is well. No Alert.
+    Exit 0
+}
