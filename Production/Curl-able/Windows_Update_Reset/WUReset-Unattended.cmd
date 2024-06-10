@@ -347,6 +347,10 @@ exit
 	echo Starting the Windows Update services.
 	net start DcomLaunch
 
+	:: ----- Cleanup Cache and Clean Image -----
+	schtasks.exe /Run /TN "\Microsoft\Windows\Servicing\StartComponentCleanup"
+	PowerShell -NoProfile -ExecutionPolicy Bypass -Command "Dism.exe /online /Cleanup-Image /StartComponentCleanup /ResetBase"
+
 	:: ----- End process -----
 	echo The operation completed successfully if you are seeing this message. Review any errors in script output.
 
