@@ -56,8 +56,8 @@ $System = Get-WmiObject WIN32_ComputerSystem
 
 # Define the path for the battery report
 $env:batteryReportPath = "C:\Temp\BatteryReport\Battery-Report.html"
-$env:cycleCountThresh = 500 # Alert if Battery is greater than this many cycles
-$env:degradeThresh = 35 # Percentage. Alert if battery degredation is beyond xx%
+$env:cycleCountThresh = 100 # Alert if Battery is greater than this many cycles
+$env:degradeThresh = 10 # Percentage. Alert if battery degredation is beyond xx%
 $env:usrUDF = 14 # UDF to write info to
 
 $Global:AlertHealthy = "| Last Measured $Date" # Define what should be displayed in Datto when monitor is healthy and $Global:AlertMsg is blank.
@@ -129,15 +129,24 @@ $Global:DiagMsg += "Estimated Battery Age based on BIOS: $batteryAgeYears years 
 $Global:DiagMsg += "Lifetime Recharge Cycle Count: $cycleCount"
 
 
-if ($cycleCount -gt $env:cycleCountThresh -or $degradationPercentage -gt $env:degradeThresh) {
-    $Global:AlertMsg += "Battery Health NOT OK. Scrutinize diagnostic log."
-    $Global:DiagMsg += "Battery Health has surpassed the set limits of:"
-    $Global:DiagMsg += "- $env:cycleCountThresh total recharge cycles ($cycleCount) ;or;"
-    $Global:DiagMsg += "- degraded beyond $env:degradeThresh % ($degradationPercentage %)"
+if ($cycleCount -gt $env:cycleCountThresh) {
+    $Global:AlertMsg += "Battery has surpassed a Recharge Cycle Count of $env:cycleCountThresh "
+    $Global:DiagMsg += "Battery Health has surpassed the set limits of: $env:cycleCountThresh total recharge cycles ($cycleCount)"
+}
+else {
+    $Global:DiagMsg += "Lifetime Recharge Cycle Count ($cycleCount) is below threshold of $env:cycleCountThresh"
+}
+
+if ($degradationPercentage -gt $env:degradeThresh) {
+    $Global:AlertMsg += "Battery has surpassed the degredation threshold of $env:degradeThresh % "
+    $Global:DiagMsg += "The Battery has degraded beyond $env:degradeThresh % ($degradationPercentage %)"
+}
+else {
+    $Global:DiagMsg += "Estimated Battery Degradation ($degradationPercentage %) is below threshold of $env:degradeThresh %"
 }
 
 #UDF Result
-$Global:varUDFString += "$remainingPercentage % Life Remaining | $cycleCount Recharge Cycles $Global:AlertHealthy"
+$Global:varUDFString += "Battery is $remainingPercentage % of Original Capacity with $cycleCount Total Recharge Cycles $Global:AlertHealthy"
 
 ######## End of Script #########
 ##################################
