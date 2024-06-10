@@ -105,6 +105,7 @@ alias c="clear"
 alias x="exit"
 alias e="code -n ~/ ~/.zshrc ~/.config/neofetch/config.conf" #ExtrasIfNeeded: ~/.aliases ~/.colors ~/.hooks
 alias r="source ~/.zshrc"
+alias vsc="cd /mnt/c/users/Alex/VSCODE"
 alias h="history -10" # last 10 history commands
 alias hc="history -c" # clear history
 alias hg="history | grep " # +command
@@ -116,10 +117,12 @@ alias desktop='kex --win -s'
 alias gcu="git config user.name \"Alex Ivantsov\" && git config user.email \"alex@ivantsov.tech\""
 alias myip='curl http://ipecho.net/plain; echo'
 alias distro='cat /etc/*-release'
+alias rustscan='sudo docker run -it --rm --name rustscan rustscan/rustscan:2.1.1'
 
 # Created by `pipx` on 2024-06-01 17:58:38
 export PATH="$PATH:/home/master/.local/bin"
-if [ -f "/home/master/.config/fabric/fabric-bootstrap.inc" ]; then . "/home/master/.config/fabric/fabric-bootstrap.inc"; fi
 
 #Neofetch
 neofetch
+
+if [ -f "/home/master/.config/fabric/fabric-bootstrap.inc" ]; then . "/home/master/.config/fabric/fabric-bootstrap.inc"; fi

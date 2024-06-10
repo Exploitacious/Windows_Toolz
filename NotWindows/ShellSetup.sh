@@ -234,6 +234,12 @@ install_nordvpn() {
   fi
 }
 
+# Install RustScan
+install_rustscan(){
+  docker pull rustscan/rustscan:2.1.1
+
+}
+
 # Function to clone and install additional configuration or dotfiles from a repository (optional)
 clone_and_install_dotfiles() {
   # URL of the .zshrc file on GitHub
@@ -327,6 +333,8 @@ clean_up_packages
 install_nordvpn
 
 install_docker
+
+install_rustscan
 
 clone_and_install_dotfiles
 
