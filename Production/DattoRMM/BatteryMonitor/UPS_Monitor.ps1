@@ -1,23 +1,21 @@
-## Laptop Battery Monitoring Script
+#
+## Template for Scripting Component Monitors for Datto RMM with PowerShell
 # Created by Alex Ivantsov @Exploitacious
 
 # Script Name and Type
-$ScriptName = "Battery Monitoring" # Quick and easy name of Script to help identify
+$ScriptName = "UPS Battery Monitoring" # Quick and easy name of Script to help identify
 $ScriptType = "Monitoring" # Monitoring // Remediation
 
 # What to Write if Alert is Healthy
-$Global:AlertHealthy = "| Last Measured $Date" # Define what should be displayed in Datto when monitor is healthy and $Global:AlertMsg is blank.
-# There is also another palce to put NO ALERT Helthy messages down below, to try and capture more script info.
+$Global:AlertHealthy = "| Last Checked $Date" # Define what should be displayed in Datto when monitor is healthy and $Global:AlertMsg is blank.
+# There is also another palce to put NO ALERT Healthy messages down below, to try and capture more script info.
 
 ## Verify/Elevate to Admin Session. Comment out if not needed the single line below.
 # if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
 ## Datto RMM Variables ## Uncomment only for testing. Otherwise, use Datto Variables. See Explanation Below.
+$env:usrUDF = 6 # Which UDF to write to. Leave blank to Skip UDF writing.
 #$env:usrString = Example # Datto User Input variable "usrString"
-$env:batteryReportPath = "C:\Temp\BatteryReport\Battery-Report.html" # Define the path for the battery report
-$env:cycleCountThresh = 100 # Alert if Battery is greater than this many cycles
-$env:degradeThresh = 10 # Percentage. Alert if battery degredation is beyond xx%
-#$env:usrUDF = 14 # UDF to write info to
 
 <#
 This is a Datto RMM Monitoring Script, used to deliver a result such as "Healthy" or "Not Healthy", in order to trigger the creation of tickets, etc.
@@ -40,10 +38,8 @@ function write-DRMMAlert ($message) {
     Write-Host '<-End Result->'
 }
 Function GenRANDString ([Int]$CharLength, [Char[]]$CharSets = "ULNS") {
-    
     $Chars = @()
     $TokenSet = @()
-    
     If (!$TokenSets) {
         $Global:TokenSets = @{
             U = [Char[]]'ABCDEFGHIJKLMNOPQRSTUVWXYZ'                                # Upper case
@@ -52,7 +48,6 @@ Function GenRANDString ([Int]$CharLength, [Char[]]$CharSets = "ULNS") {
             S = [Char[]]'!"#%&()*+,-./:;<=>?@[\]^_{}~'                             # Symbols
         }
     }
-
     $CharSets | ForEach-Object {
         $Tokens = $TokenSets."$_" | ForEach-Object { If ($Exclude -cNotContains $_) { $_ } }
         If ($Tokens) {
@@ -60,7 +55,6 @@ Function GenRANDString ([Int]$CharLength, [Char[]]$CharSets = "ULNS") {
             If ($_ -cle [Char]"Z") { $Chars += $Tokens | Get-Random }             #Character sets defined in upper case are mandatory
         }
     }
-
     While ($Chars.Count -lt $CharLength) { $Chars += $TokensSet | Get-Random }
     ($Chars | Sort-Object { Get-Random }) -Join ""                                #Mix the (mandatory) characters and output string
 };
@@ -82,84 +76,102 @@ $Global:DiagMsg += "Script UID: " + $ScriptUID
 ##################################
 ######## Start of Script #########
 
-# Create the directory if it doesn't exist
-if (-not (Test-Path -Path "C:\Temp\BatteryReport")) {
-    New-Item -ItemType Directory -Path "C:\Temp\BatteryReport"
-}
-
-# Function to check if powercfg is available
-function Test-PowerCfg {
+# Function to check if WMIC is available
+function Test-WMIC {
     try {
-        $null = powercfg /? 2>$null
+        $null = wmic /? 2>$null
         return $true
     }
     catch {
         return $false
     }
 }
+if (-not (Test-WMIC)) {
+    write-DRMMAlert "WMIC is not available on this system."
+    exit 1
+}
+# Function to get UPS information using CIM
+function Get-UPSInfo {
+    try {
+        # Query UPS data using CIM
+        $upsInfo = Get-CimInstance -ClassName Win32_Battery
+        return $upsInfo
+    }
+    catch {
+        $Global:DiagMsg += "Failed to retrieve UPS data using CIM: $_"
+        return $null
+    }
+}
 
-# Check if powercfg is available
-if (-not (Test-PowerCfg)) {
-    $Global:AlertMsg += "powercfg is not available on this system."
+## Generate UPS report
+$upsInfo = Get-UPSInfo
+if ($null -eq $upsInfo) {
+    write-DRMMAlert "No UPS detected or CIM did not return any data."
+    exit 1
+}
+
+# Extract relevant information
+$availability = $upsInfo.Availability
+$batteryStatus = [int]$upsInfo.BatteryStatus
+$caption = $upsInfo.Caption
+$chemistry = [int]$upsInfo.Chemistry
+$designVoltage = $upsInfo.DesignVoltage
+$deviceID = $upsInfo.DeviceID
+$estimatedChargeRemaining = $upsInfo.EstimatedChargeRemaining
+$estimatedRunTime = $upsInfo.EstimatedRunTime
+$name = $upsInfo.Name
+$status = $upsInfo.Status
+$systemName = $upsInfo.SystemName
+# Explanation of Battery codes
+$batteryStatusExplanation = @{
+    1 = "Discharging"
+    2 = "Charging"
+    3 = "Fully charged"
+}
+$chemistryExplanation = @{
+    1 = "Other"
+    2 = "Unknown"
+    3 = "Lead Acid"
+    4 = "Nickel Cadmium"
+    5 = "Nickel Metal Hydride"
+    6 = "Lithium-ion"
+    7 = "Zinc Air"
+    8 = "Lithium Polymer"
+}
+# Extract numeric value from DeviceID and append "VA"
+$vaRating = if ($deviceID -match '\d+') { "$($matches[0])VA" } else { "Unknown" }
+# Get battery status explanation or default to "Unknown"
+$batteryStatusDesc = if ($batteryStatusExplanation.ContainsKey($batteryStatus)) { $batteryStatusExplanation[$batteryStatus] } else { "Unknown" }
+# Get chemistry explanation or default to "Unknown"
+$chemistryDesc = if ($chemistryExplanation.ContainsKey($chemistry)) { $chemistryExplanation[$chemistry] } else { "Unknown" }
+
+# Create the report string
+$Global:DiagMsg += " "
+$Global:DiagMsg += "Health: $status"
+$Global:DiagMsg += "Battery Status: $batteryStatus ($batteryStatusDesc)"
+$Global:DiagMsg += "Estimated Charge Remaining: $estimatedChargeRemaining %"
+$Global:DiagMsg += "Estimated Run Time: $estimatedRunTime minutes"
+$Global:DiagMsg += " "
+$Global:DiagMsg += "Model: $name"
+$Global:DiagMsg += "VA Rating: $vaRating"
+$Global:DiagMsg += "Chemistry: $chemistry ($chemistryDesc)"
+$Global:DiagMsg += "Design Voltage: $designVoltage mV"
+$Global:DiagMsg += "Device ID: $deviceID"
+
+# Check UPS Status
+if ($status -ne "OK") {
+    $Global:AlertMsg += "$chemistryDesc $vaRating UPS $status | Check Diagnostic Log"
+}
+
+if ($Global:AlertMsg) {
+    # Display Alert in UDF if there is Alert
+    $Global:varUDFString += $Global:AlertMsg
 }
 else {
-    $Global:DiagMsg += "Full Battery Report Here: $env:batteryReportPath"
+    # Display UPS Info in UDF if UPS Detected
+    $Global:varUDFString += "$chemistryDesc $name $vaRating UPS $status | $batteryStatusDesc $estimatedChargeRemaining % | Runtime: $estimatedRunTime minutes $Global:AlertHealthy"
 }
 
-# Generate the battery report
-powercfg /batteryreport /output $env:batteryReportPath
-
-# Wait for the report to be generated
-Start-Sleep -Seconds 5
-
-# Extract and read the information from the battery report
-$reportContent = Get-Content -Path $env:batteryReportPath -Raw
-
-# Extract the information using regex
-$designCapacity = [regex]::Match($reportContent, 'DESIGN CAPACITY.*?(\d+,?\d*) mWh').Groups[1].Value -replace ',', ''
-$fullChargeCapacity = [regex]::Match($reportContent, 'FULL CHARGE CAPACITY.*?(\d+,?\d*) mWh').Groups[1].Value -replace ',', ''
-$cycleCount = [regex]::Match($reportContent, 'CYCLE COUNT.*?(\d+)').Groups[1].Value
-$biosDate = [regex]::Match($reportContent, 'BIOS\s*.*?(\d{2}/\d{2}/\d{4})').Groups[1].Value
-
-# Calculate the degradation percentage
-$degradationPercentage = [math]::Round((1 - ($fullChargeCapacity / $designCapacity)) * 100, 2)
-$remainingPercentage = 100 - $degradationPercentage
-
-# Parse the BIOS date flexibly
-$biosDateTime = [datetime]::ParseExact($biosDate, 'MM/dd/yyyy', $null)
-
-# Calculate the estimated battery age based on the BIOS date
-$currentDateTime = Get-Date
-$batteryAgeDays = ($currentDateTime - $biosDateTime).Days
-$batteryAgeYears = [math]::Round($batteryAgeDays / 365, 2)
-
-# Create a report strings
-$Global:DiagMsg += "Battery Design Capacity: $designCapacity mWh"
-$Global:DiagMsg += "Current Max Charge Capacity: $fullChargeCapacity mWh"
-$Global:DiagMsg += "Estimated Battery Degradation: $degradationPercentage %"
-$Global:DiagMsg += "Max Battery Capacity: $remainingPercentage %"
-$Global:DiagMsg += "Estimated Battery Age based on BIOS: $batteryAgeYears years ($batteryAgeDays days)"
-$Global:DiagMsg += "Lifetime Recharge Cycle Count: $cycleCount"
-
-# Test strings for Alerts
-if ($cycleCount -gt $env:cycleCountThresh) {
-    $Global:AlertMsg += "Battery has surpassed a Recharge Cycle Count of $env:cycleCountThresh "
-    $Global:DiagMsg += "Battery Health has surpassed the set limits of: $env:cycleCountThresh total recharge cycles ($cycleCount)"
-}
-else {
-    $Global:DiagMsg += "Lifetime Recharge Cycle Count ($cycleCount) is below threshold of $env:cycleCountThresh"
-}
-
-if ($degradationPercentage -gt $env:degradeThresh) {
-    $Global:AlertMsg += "Battery has surpassed the degredation threshold of $env:degradeThresh % "
-    $Global:DiagMsg += "The Battery has degraded beyond $env:degradeThresh % ($degradationPercentage %)"
-}
-else {
-    $Global:DiagMsg += "Estimated Battery Degradation ($degradationPercentage %) is below threshold of $env:degradeThresh %"
-}
-
-#UDF Result
-$Global:varUDFString += "Battery is $remainingPercentage % of Original Capacity with $cycleCount Total Recharge Cycles $Global:AlertHealthy"
 
 ######## End of Script ###########
 ##################################
@@ -194,7 +206,7 @@ else {
     $Global:DiagMsg += "Leaving Script with Exit Code 0 (No Alert)"
 
     ##### You may alter the NO ALERT Exit Message #####
-    write-DRMMAlert "Battery is $remainingPercentage % of Original Capacity with $cycleCount Total Recharge Cycles $Global:AlertHealthy"
+    write-DRMMAlert "$chemistryDesc $vaRating UPS $status $Global:AlertHealthy"
     write-DRMMDiag $Global:DiagMsg
 
     # Exit 0 means all is well. No Alert.

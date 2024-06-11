@@ -8,7 +8,7 @@ $ScriptType = "Monitoring" # Monitoring // Remediation
 
 # What to Write if Alert is Healthy
 $Global:AlertHealthy = " | Last Checked $Date" # Define what should be displayed in Datto when monitor is healthy and $Global:AlertMsg is blank.
-# There is also another palce to put NO ALERT mHelthy messages down below, to try and capture more script info.
+# There is also another palce to put NO ALERT Healthy messages down below, to try and capture more script info.
 
 ## Verify/Elevate to Admin Session. Comment out if not needed the single line below.
 # if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
@@ -18,7 +18,7 @@ $Global:AlertHealthy = " | Last Checked $Date" # Define what should be displayed
 #$env:usrString = Example # Datto User Input variable "usrString"
 
 <#
-This is a Datto RMM MOnitoring Script, used to deliver a result such as "Healthy" or "Not Healthy", in order to trigger the creation of tickets, etc.
+This is a Datto RMM Monitoring Script, used to deliver a result such as "Healthy" or "Not Healthy", in order to trigger the creation of tickets, etc.
 
 To create Variables in Datto RMM Script component, you must use $env variables in the powershell script, simply by matching the name and adding "env:" before them.
 For example, in Datto we can use a variable for user input called "usrUDF" and here we use "$env:usrUDF=" to use that variable.
@@ -99,8 +99,8 @@ if ($env:usrUDF -ge 1) {
         Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString) -Force
     }
 }
-#######################################################################
 ### Exit script with proper Datto alerting, diagnostic and API Results.
+#######################################################################
 if ($Global:AlertMsg) {
     # If your AlertMsg has value, this is how it will get reported.
     $Global:DiagMsg += "Exiting Script with Exit Code 1 (Trigger Alert)"
