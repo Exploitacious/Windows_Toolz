@@ -1,32 +1,37 @@
-## Template for Scripting / Monitoring with Datto RMM
+# 
+## Template for Remediation Components for Datto RMM with PowerShell
 # Created by Alex Ivantsov @Exploitacious
+
+# Script Name and Type
+$ScriptName = "Install System Update" # Quick and easy name of Script to help identify
+$ScriptType = "Remediation" # Monitoring // Remediation
+
+## Verify/Elevate to Admin Session. Comment out if not needed the single line below.
+# if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
+
+## Datto RMM Variables ## Uncomment only for testing. Otherwise, use Datto Variables. See Explanation Below.
+#$env:APIEndpoint = "https://prod-36.westus.logic.azure.com:443/workflows/6c032a1ca84045b9a7a1436864ecf696/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=c-dVa333HMzhWli_Fp_4IIAqaJOMwFjP2y5Zfv4j_zA"
+#$env:usrUDF = 14 # Which UDF to write to. Leave blank to Skip UDF writing.
+#$env:usrString = Example # Datto User Input variable "usrString"
+
 <#
-    Latest Updates:
-     Running a powershell script from a PC which returns values back into a ticket (hopefully)!
+This Script is a Remediation compoenent, meaning it performs only one task with a log of granular detail. These task results can be added back ito tickets as time entries using the API. 
 
-Here you will find all the standard variables to use with Datto RMM to interract with all the the visual, alert and diagnostics cues available from the dashboards.
-Each variable can be assigned a powershell output value and write various things into Datto RMM.
+To create Variables in Datto RMM Script component, you must use $env variables in the powershell script, simply by matching the name and adding "env:" before them.
+For example, in Datto we can use a variable for user input called "usrUDF" and here we use "$env:usrUDF=" to use that variable.
 
-To create Variables in Datto RMM script component, you must use $env variables in the powershell script. For example, here we use $env:usrUDF= variable, so we would set this up in datto as usrUDF variable for it to work here. You can use as many of these as you like.
-$env:usrUDF = 14 # Which UDF to write to. Leave blank to Skip UDF writing.
-$env:usrString = Example # Datto User Input variable "usrString"
+You can use as many of these as you like.
 
+Below you will find all the standard variables to use with Datto RMM to interract with all the the visual, alert and diagnostics cues available from the dashboards.
 #># DattoRMM Alert Functions. Don't touch these unless you know what you're doing.
 function write-DRMMDiag ($messages) {
     Write-Host  '<-Start Diagnostic->'
     foreach ($Message in $Messages) { $Message + ' `' }
     Write-Host '<-End Diagnostic->'
 }
-function write-DRMMAlert ($message) {
-    Write-Host '<-Start Result->'
-    Write-Host "STATUS=$message"
-    Write-Host '<-End Result->'
-}
 Function GenRANDString ([Int]$CharLength, [Char[]]$CharSets = "ULNS") {
-    
     $Chars = @()
     $TokenSet = @()
-    
     If (!$TokenSets) {
         $Global:TokenSets = @{
             U = [Char[]]'ABCDEFGHIJKLMNOPQRSTUVWXYZ'                                # Upper case
@@ -35,7 +40,6 @@ Function GenRANDString ([Int]$CharLength, [Char[]]$CharSets = "ULNS") {
             S = [Char[]]'!"#%&()*+,-./:;<=>?@[\]^_{}~'                             # Symbols
         }
     }
-
     $CharSets | ForEach-Object {
         $Tokens = $TokenSets."$_" | ForEach-Object { If ($Exclude -cNotContains $_) { $_ } }
         If ($Tokens) {
@@ -43,26 +47,22 @@ Function GenRANDString ([Int]$CharLength, [Char[]]$CharSets = "ULNS") {
             If ($_ -cle [Char]"Z") { $Chars += $Tokens | Get-Random }             #Character sets defined in upper case are mandatory
         }
     }
-
     While ($Chars.Count -lt $CharLength) { $Chars += $TokensSet | Get-Random }
     ($Chars | Sort-Object { Get-Random }) -Join ""                                #Mix the (mandatory) characters and output string
 };
-# Extra Info and Variables
+# Extra Info and Variables (Leave at default)
 $Global:DiagMsg = @() # Running Diagnostic log (diaglog). Use " $Global:DiagMsg += " to append messages to this log for verboseness in the script.
-$Global:AlertMsg = @() # Combined Alert message. If left blank, will not trigger Alert status. Use " $Global:AlertMsg += " to append messages to be alerted on in Datto.
 $Global:varUDFString = @() # String which will be written to UDF, if UDF Number is defined by $usrUDF in Datto. Use " $Global:varUDFString += " to fill this string.
 $ScriptUID = GenRANDString 15 UN # Generate random UID for script
 $Date = get-date -Format "MM/dd/yyy hh:mm tt"
-$System = Get-WmiObject WIN32_ComputerSystem  
+$System = Get-WmiObject WIN32_ComputerSystem
+$Global:DiagMsg += "Script Type: " + $ScriptType
+$Global:DiagMsg += "Script Name: " + $ScriptName
+$Global:DiagMsg += "Script UID: " + $ScriptUID  
 #$OS = Get-CimInstance WIN32_OperatingSystem 
 #$Core = Get-WmiObject win32_processor 
 #$GPU = Get-WmiObject WIN32_VideoController  
 #$Disk = get-WmiObject win32_logicaldisk
-$Global:AlertHealthy = "Success: Updated $Date" # Define what should be displayed in Datto when monitor is healthy and $Global:AlertMsg is blank.
-### $APIEndpoint = "https://prod-36.westus.logic.azure.com:443/workflows/6c032a1ca84045b9a7a1436864ecf696/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=c-dVa333HMzhWli_Fp_4IIAqaJOMwFjP2y5Zfv4j_zA"
-$Global:DiagMsg += "Script UID: " + $ScriptUID
-# Verify/Elevate Admin Session. Comment out if not needed.
-#### if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 ##################################
 ##################################
 ######## Start of Script #########
@@ -73,7 +73,7 @@ $Global:DiagMsg += "Script UID: " + $ScriptUID
 
 
 
-######## End of Script #########
+######## End of Script ###########
 ##################################
 ##################################
 ### Write to UDF if usrUDF (Write To) Number is defined. (Optional)
@@ -90,18 +90,15 @@ if ($env:usrUDF -ge 1) {
         Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString) -Force
     }
 }
-else {
-    # Write to diaglog
-    # $Global:DiagMsg += " - not writing to UDF"
-}
-### Info sent to into JSON POST to API Endpoint (Optional)
-$InfoHashTable = @{
+### Info to be sent to into JSON POST to API Endpoint (Optional)
+$APIinfoHashTable = @{
     'CS_ACCOUNT_UID'  = $env:CS_ACCOUNT_UID
     'CS_PROFILE_DESC' = $env:CS_PROFILE_DESC
     'CS_PROFILE_NAME' = $env:CS_PROFILE_NAME
     'CS_PROFILE_UID'  = $env:CS_PROFILE_UID
     'Script_Diag'     = $Global:DiagMsg
     'Script_UID'      = $ScriptUID
+    'Script_type'     = $ScriptType
     'Date_Time'       = $Date
     'Comp_Model'      = $System.Model 
     'Comp_Make'       = $System.Manufacturer 
@@ -136,32 +133,13 @@ $InfoHashTable = @{
     #'Comp_OSD'              = $OS.InstallDate 
     #'Comp_OS'               = $OS.Caption 
 }
-### Exit script with proper Datto alerting, diagnostic and API Results.
-if ($Global:AlertMsg) {
-    # Add Script Result and POST to API if an Endpoint is Provided
-    if ($null -ne $APIEndpoint) {
-        $Global:DiagMsg += " - Sending Results to API"
-        $InfoHashTable.add("Script_Result", "$Global:AlertMsg")
-        Invoke-WebRequest -Uri $APIEndpoint -Method POST -Body ($InfoHashTable | ConvertTo-Json) -ContentType "application/json"
-    }
-    # If your AlertMsg has value, this is how it will get reported.
-    write-DRMMAlert $Global:AlertMsg
-    write-DRMMDiag $Global:DiagMsg
-
-    # Exit 1 means DISPLAY ALERT
-    Exit 1
+#######################################################################
+### Exit script with proper Datto diagnostic and API Results.
+# Add Script Result and POST to API if an Endpoint is Provided
+if ($null -ne $APIEndpoint) {
+    $Global:DiagMsg += " - Sending Results to API"
+    Invoke-WebRequest -Uri $APIEndpoint -Method POST -Body ($APIinfoHashTable | ConvertTo-Json) -ContentType "application/json"
 }
-else {
-    # Add Script Result and POST to API if an Endpoint is Provided
-    if ($null -ne $APIEndpoint) {
-        $Global:DiagMsg += " - Sending Results to API"
-        $InfoHashTable.add("Script_Result", "$Global:AlertHealthy")
-        Invoke-WebRequest -Uri $APIEndpoint -Method POST -Body ($InfoHashTable | ConvertTo-Json) -ContentType "application/json"
-    }
-    # If the AlertMsg variable is blank (nothing was added), the script will report healthy status with whatever was defined above.
-    write-DRMMAlert $Global:AlertHealthy
-    write-DRMMDiag $Global:DiagMsg
-
-    # Exit 0 means all is well. No Alert.
-    Exit 0
-}
+# Exit with writing diagnostic back to the ticket / remediation component log
+write-DRMMDiag $Global:DiagMsg
+Exit 0

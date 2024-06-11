@@ -1,7 +1,11 @@
-# Test Script for Generating an Alert and sending Data to API to feed back into ticket
-
+# 
 ## Template for Scripting / Monitoring with Datto RMM
 # Created by Alex Ivantsov @Exploitacious
+
+# Script Name and Type
+$ScriptName = "Lenovo System Update"
+$ScriptType = "Repair"
+
 <#
     Latest Updates:
      Running a powershell script from a PC which returns values back into a ticket (hopefully)!
@@ -49,8 +53,6 @@ Function GenRANDString ([Int]$CharLength, [Char[]]$CharSets = "ULNS") {
     While ($Chars.Count -lt $CharLength) { $Chars += $TokensSet | Get-Random }
     ($Chars | Sort-Object { Get-Random }) -Join ""                                #Mix the (mandatory) characters and output string
 };
-# Script Name
-$ScriptName = "Lenovo System Update"
 # Extra Info and Variables
 $Global:DiagMsg = @() # Running Diagnostic log (diaglog). Use " $Global:DiagMsg += " to append messages to this log for verboseness in the script.
 $Global:AlertMsg = @() # Combined Alert message. If left blank, will not trigger Alert status. Use " $Global:AlertMsg += " to append messages to be alerted on in Datto.
@@ -64,7 +66,8 @@ $System = Get-WmiObject WIN32_ComputerSystem
 #$Disk = get-WmiObject win32_logicaldisk
 $Global:AlertHealthy = "| Updated $Date" # Define what should be displayed in Datto when monitor is healthy and $Global:AlertMsg is blank.
 
-### $APIEndpoint = "https://prod-36.westus.logic.azure.com:443/workflows/6c032a1ca84045b9a7a1436864ecf696/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=c-dVa333HMzhWli_Fp_4IIAqaJOMwFjP2y5Zfv4j_zA"
+$APIEndpoint = "https://prod-36.westus.logic.azure.com:443/workflows/6c032a1ca84045b9a7a1436864ecf696/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=c-dVa333HMzhWli_Fp_4IIAqaJOMwFjP2y5Zfv4j_zA"
+$Global:DiagMsg += "Script Type: " + $ScriptType
 $Global:DiagMsg += "Script Name: " + $ScriptName
 $Global:DiagMsg += "Script UID: " + $ScriptUID
 # Verify/Elevate Admin Session. Comment out if not needed.
@@ -166,6 +169,7 @@ $InfoHashTable = @{
     'Script_Alert'    = $Global:AlertMsg
     'Script_Diag'     = $Global:DiagMsg
     'Script_UID'      = $ScriptUID
+    'Script_type'     = $ScriptType
     'Date_Time'       = $Date
     'Comp_Model'      = $System.Model 
     'Comp_Make'       = $System.Manufacturer 
