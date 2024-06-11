@@ -17,41 +17,36 @@ Get-ChildItem ("HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Unin
 Get as specific as you can with your searches. In case there are multiple results displayed for "adobe", try to search and match exactly what you're seeking - from the "BrandName" or "DisplayName" of the app displayed.
 ###>
 
-$varString = $env:usrString
-$varCounter = 0
-$varAlert = 1
+function Check-SoftwareInstall {
+    param (
+        [string]$SoftwareName,
+        [string]$Method
+    )
 
-$Detection = Get-ChildItem ("HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\SOFTWARE") | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName, $_.BrandName -match "$varString" } | Select-Object
-
-if ($Null -ne $Detection) {
-    $varCounter ++
-}
-else {
     $varCounter = 0
-}
 
-if ($env:usrMethod -match 'EQ') {
-    if ($varCounter -ge 1) {
-        $varExitString = "Software $varString is installed. "
-        $varAlert = 1
+    $Detection = Get-ChildItem ("HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\SOFTWARE") | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName, $_.BrandName -match "$SoftwareName" } | Select-Object
+
+    if ($Null -ne $Detection) {
+        $varCounter ++
     }
     else {
-        $varExitString = "Software $varString is not installed. "
-        $varAlert = 0
+        $varCounter = 0
     }
-}
-elseif ($env:usrMethod -match 'NE') {
-    if ($varCounter -lt 1) {
-        $varExitString = "Software $varString is not installed. "
-        $varAlert = 1
+
+    if ($Method -eq 'EQ') {
+        return $varCounter -ge 1
+    }
+    elseif ($Method -eq 'NE') {
+        return $varCounter -lt 1
     }
     else {
-        $varExitString = "Software $varString is installed. "
-        $varAlert = 0
+        throw "Invalid method. Please use 'EQ' or 'NE'."
     }
 }
-else {
-    exit 1
-}
 
-Write-Host "$varExitString"
+# Example usage:
+$softwareName = "Lenovo System Update"
+$method = 'EQ'
+$result = Check-SoftwareInstall -SoftwareName $softwareName -Method $method
+Write-Host "Result: $result"
