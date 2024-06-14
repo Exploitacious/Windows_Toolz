@@ -55,14 +55,10 @@ $Global:DiagMsg = @() # Running Diagnostic log (diaglog). Use " $Global:DiagMsg 
 $Global:varUDFString = @() # String which will be written to UDF, if UDF Number is defined by $usrUDF in Datto. Use " $Global:varUDFString += " to fill this string.
 $ScriptUID = GenRANDString 15 UN # Generate random UID for script
 $Date = get-date -Format "MM/dd/yyy hh:mm tt"
-$System = Get-WmiObject WIN32_ComputerSystem
 $Global:DiagMsg += "Script Type: " + $ScriptType
 $Global:DiagMsg += "Script Name: " + $ScriptName
-$Global:DiagMsg += "Script UID: " + $ScriptUID  
-#$OS = Get-CimInstance WIN32_OperatingSystem 
-#$Core = Get-WmiObject win32_processor 
-#$GPU = Get-WmiObject WIN32_VideoController  
-#$Disk = get-WmiObject win32_logicaldisk
+$Global:DiagMsg += "Script UID: " + $ScriptUID
+$Global:DiagMsg += "Executed On: " + $Date  
 ##################################
 ##################################
 ######## Start of Script #########
@@ -92,53 +88,16 @@ if ($env:usrUDF -ge 1) {
 }
 ### Info to be sent to into JSON POST to API Endpoint (Optional)
 $APIinfoHashTable = @{
-    'CS_ACCOUNT_UID'  = $env:CS_ACCOUNT_UID
-    'CS_PROFILE_DESC' = $env:CS_PROFILE_DESC
-    'CS_PROFILE_NAME' = $env:CS_PROFILE_NAME
-    'CS_PROFILE_UID'  = $env:CS_PROFILE_UID
-    'Script_Diag'     = $Global:DiagMsg
-    'Script_UID'      = $ScriptUID
-    'Script_type'     = $ScriptType
-    'Date_Time'       = $Date
-    'Comp_Model'      = $System.Model 
-    'Comp_Make'       = $System.Manufacturer 
-    'Comp_Hostname'   = $System.Name
-    'Comp_LastUser'   = $System.UserName
-    ########################################
-    #'CS_CC_HOST'            = $env:CS_CC_HOST
-    #'CS_CC_PORT1'           = $env:CS_CC_PORT1
-    #'CS_CSM_ADDRESS'        = $env:CS_CSM_ADDRESS
-    #'CS_DOMAIN'             = $env:CS_DOMAIN
-    #'CS_PROFILE_PROXY_TYPE' = $env:CS_PROFILE_PROXY_TYPE
-    #'CS_WS_ADDRESS'         = $env:CS_WS_ADDRESS
-    #'Local_Admin_PW'        = $env:UDF_1
-    #'Bitlocker_TPMStatus'   = $env:UDF_2
-    #'Windows_Activation'    = $env:UDF_3
-    #'DRMM_Agent_Health'     = $env:UDF_4
-    #'Patch_Policy_Status'   = $env:UDF_5
-    #'WU_Service_Health'     = $env:UDF_6
-    #'Ext_WU_Details'        = $env:UDF_7
-    #'Azure_AD_Status'       = $env:UDF_8
-    #'Windows_Keys_Found'    = $env:UDF_9
-    #'Office_Keys_Found'     = $env:UDF_10
-    #'Server_Roles'          = $env:UDF_11
-    #'Log4J_Detection'       = $env:UDF_12
-    #'TL_ComputerID'         = $env:UDF_13
-    #'Local_Admins_Present'  = $env:UDF_14
-    #'UDF_30'                = $env:UDF_30
-    #'Comp_CPU_Cores'        = $Core.NumberOfCores 
-    #'Comp_CPU_Model'        = $Core.Caption 
-    #'Comp_Ram'              = $System.TotalPhysicalMemory 
-    #'Comp_GPU'              = $GPU.Caption 
-    #'Comp_OSD'              = $OS.InstallDate 
-    #'Comp_OS'               = $OS.Caption 
+    'CS_PROFILE_UID' = $env:CS_PROFILE_UID
+    'Script_Diag'    = $Global:DiagMsg
+    'Script_UID'     = $ScriptUID
 }
 #######################################################################
 ### Exit script with proper Datto diagnostic and API Results.
 # Add Script Result and POST to API if an Endpoint is Provided
-if ($null -ne $APIEndpoint) {
+if ($null -ne $env:APIEndpoint) {
     $Global:DiagMsg += " - Sending Results to API"
-    Invoke-WebRequest -Uri $APIEndpoint -Method POST -Body ($APIinfoHashTable | ConvertTo-Json) -ContentType "application/json"
+    Invoke-WebRequest -Uri $env:APIEndpoint -Method POST -Body ($APIinfoHashTable | ConvertTo-Json) -ContentType "application/json"
 }
 # Exit with writing diagnostic back to the ticket / remediation component log
 write-DRMMDiag $Global:DiagMsg

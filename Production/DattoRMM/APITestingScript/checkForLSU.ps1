@@ -3,22 +3,23 @@
 # Created by Alex Ivantsov @Exploitacious
 
 # Script Name and Type
-$ScriptName = "Check if Manufacturer is Lenovo" # Quick and easy name of Script to help identify
+$ScriptName = "Check for Lenovo System Update" # Quick and easy name of Script to help identify
 $ScriptType = "Monitoring" # Monitoring // Remediation
 
 # What to Write if Alert is Healthy
-$Global:AlertHealthy = " | Last Checked $Date" # Define what should be displayed in Datto when monitor is healthy and $Global:AlertMsg is blank.
-# There is also another palce to put NO ALERT mHelthy messages down below, to try and capture more script info.
+$Global:AlertHealthy = "| Last Checked $Date" # Define what should be displayed in Datto when monitor is healthy and $Global:AlertMsg is blank.
+# There is also another palce to put NO ALERT Healthy messages down below, to try and capture more script info.
 
 ## Verify/Elevate to Admin Session. Comment out if not needed the single line below.
 # if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
 ## Datto RMM Variables ## Uncomment only for testing. Otherwise, use Datto Variables. See Explanation Below.
-#$env:APIEndpoint = "https://prod-36.westus.logic.azure.com:443/workflows/6c032a1ca84045b9a7a1436864ecf696/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=c-dVa333HMzhWli_Fp_4IIAqaJOMwFjP2y5Zfv4j_zA"
 #$env:usrUDF = 14 # Which UDF to write to. Leave blank to Skip UDF writing.
 #$env:usrString = Example # Datto User Input variable "usrString"
 
 <#
+This is a Datto RMM Monitoring Script, used to deliver a result such as "Healthy" or "Not Healthy", in order to trigger the creation of tickets, etc.
+
 To create Variables in Datto RMM Script component, you must use $env variables in the powershell script, simply by matching the name and adding "env:" before them.
 For example, in Datto we can use a variable for user input called "usrUDF" and here we use "$env:usrUDF=" to use that variable.
 
@@ -63,21 +64,54 @@ $Global:AlertMsg = @() # Combined Alert message. If left blank, will not trigger
 $Global:varUDFString = @() # String which will be written to UDF, if UDF Number is defined by $usrUDF in Datto. Use " $Global:varUDFString += " to fill this string.
 $ScriptUID = GenRANDString 15 UN # Generate random UID for script
 $Date = get-date -Format "MM/dd/yyy hh:mm tt"
-$System = Get-WmiObject WIN32_ComputerSystem
 $Global:DiagMsg += "Script Type: " + $ScriptType
 $Global:DiagMsg += "Script Name: " + $ScriptName
-$Global:DiagMsg += "Script UID: " + $ScriptUID  
-#$OS = Get-CimInstance WIN32_OperatingSystem 
-#$Core = Get-WmiObject win32_processor 
-#$GPU = Get-WmiObject WIN32_VideoController  
-#$Disk = get-WmiObject win32_logicaldisk
+$Global:DiagMsg += "Script UID: " + $ScriptUID
+$Global:DiagMsg += "Executed On: " + $Date  
 ##################################
 ##################################
 ######## Start of Script #########
 
+$System = Get-WmiObject WIN32_ComputerSystem  
 
+function Check-SoftwareInstall {
+    param (
+        [string]$SoftwareName,
+        [string]$Method
+    )
 
-### Script Goes Here ###
+    $varCounter = 0
+
+    $Detection = Get-ChildItem ("HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\SOFTWARE") | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName, $_.BrandName -match "$SoftwareName" } | Select-Object
+
+    if ($Null -ne $Detection) {
+        $varCounter ++
+    }
+    else {
+        $varCounter = 0
+    }
+
+    if ($Method -eq 'EQ') {
+        return $varCounter -ge 1
+    }
+    elseif ($Method -eq 'NE') {
+        return $varCounter -lt 1
+    }
+    else {
+        throw "Invalid method. Please use 'EQ' or 'NE'."
+    }
+}
+
+$Global:DiagMsg += "Checking for Lenovo System Update Software Install..."
+$SoftwareResult = Check-SoftwareInstall -SoftwareName $softwareName -Method $method
+
+if (!$SoftwareResult) {
+    $Global:DiagMsg += "Update software is missing"
+    $Global:AlertMsg += "Lenovo System Update Software is missing"
+}
+else {
+    $Global:DiagMsg += "Lenovo System Update is already Installed."
+}
 
 
 
@@ -98,58 +132,9 @@ if ($env:usrUDF -ge 1) {
         Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString) -Force
     }
 }
-### Info to be sent to into JSON POST to API Endpoint (Optional)
-$APIinfoHashTable = @{
-    'CS_ACCOUNT_UID'  = $env:CS_ACCOUNT_UID
-    'CS_PROFILE_DESC' = $env:CS_PROFILE_DESC
-    'CS_PROFILE_NAME' = $env:CS_PROFILE_NAME
-    'CS_PROFILE_UID'  = $env:CS_PROFILE_UID
-    'Script_Diag'     = $Global:DiagMsg
-    'Script_UID'      = $ScriptUID
-    'Script_type'     = $ScriptType
-    'Date_Time'       = $Date
-    'Comp_Model'      = $System.Model 
-    'Comp_Make'       = $System.Manufacturer 
-    'Comp_Hostname'   = $System.Name
-    'Comp_LastUser'   = $System.UserName
-    ########################################
-    #'CS_CC_HOST'            = $env:CS_CC_HOST
-    #'CS_CC_PORT1'           = $env:CS_CC_PORT1
-    #'CS_CSM_ADDRESS'        = $env:CS_CSM_ADDRESS
-    #'CS_DOMAIN'             = $env:CS_DOMAIN
-    #'CS_PROFILE_PROXY_TYPE' = $env:CS_PROFILE_PROXY_TYPE
-    #'CS_WS_ADDRESS'         = $env:CS_WS_ADDRESS
-    #'Local_Admin_PW'        = $env:UDF_1
-    #'Bitlocker_TPMStatus'   = $env:UDF_2
-    #'Windows_Activation'    = $env:UDF_3
-    #'DRMM_Agent_Health'     = $env:UDF_4
-    #'Patch_Policy_Status'   = $env:UDF_5
-    #'WU_Service_Health'     = $env:UDF_6
-    #'Ext_WU_Details'        = $env:UDF_7
-    #'Azure_AD_Status'       = $env:UDF_8
-    #'Windows_Keys_Found'    = $env:UDF_9
-    #'Office_Keys_Found'     = $env:UDF_10
-    #'Server_Roles'          = $env:UDF_11
-    #'Log4J_Detection'       = $env:UDF_12
-    #'TL_ComputerID'         = $env:UDF_13
-    #'Local_Admins_Present'  = $env:UDF_14
-    #'UDF_30'                = $env:UDF_30
-    #'Comp_CPU_Cores'        = $Core.NumberOfCores 
-    #'Comp_CPU_Model'        = $Core.Caption 
-    #'Comp_Ram'              = $System.TotalPhysicalMemory 
-    #'Comp_GPU'              = $GPU.Caption 
-    #'Comp_OSD'              = $OS.InstallDate 
-    #'Comp_OS'               = $OS.Caption 
-}
-#######################################################################
 ### Exit script with proper Datto alerting, diagnostic and API Results.
+#######################################################################
 if ($Global:AlertMsg) {
-    # Add Script Result and POST to API if an Endpoint is Provided
-    if ($null -ne $APIEndpoint) {
-        $Global:DiagMsg += " - Sending Results to API"
-        $APIinfoHashTable.add("Script_Result", "$Global:AlertMsg")
-        Invoke-WebRequest -Uri $APIEndpoint -Method POST -Body ($APIinfoHashTable | ConvertTo-Json) -ContentType "application/json"
-    }
     # If your AlertMsg has value, this is how it will get reported.
     $Global:DiagMsg += "Exiting Script with Exit Code 1 (Trigger Alert)"
     write-DRMMAlert $Global:AlertMsg
@@ -159,17 +144,11 @@ if ($Global:AlertMsg) {
     Exit 1
 }
 else {
-    # Add Script Result and POST to API if an Endpoint is Provided
-    if ($null -ne $APIEndpoint) {
-        $Global:DiagMsg += " - Sending Results to API"
-        $APIinfoHashTable.add("Script_Result", "$Global:AlertHealthy")
-        Invoke-WebRequest -Uri $APIEndpoint -Method POST -Body ($APIinfoHashTable | ConvertTo-Json) -ContentType "application/json"
-    }
     # If the AlertMsg variable is blank (nothing was added), the script will report healthy status with whatever was defined above.
     $Global:DiagMsg += "Leaving Script with Exit Code 0 (No Alert)"
 
     ##### You may alter the NO ALERT Exit Message #####
-    write-DRMMAlert "No Alert Message Here $Global:AlertHealthy"
+    write-DRMMAlert "Lenovo System Update is Installed $Global:AlertHealthy"
     write-DRMMDiag $Global:DiagMsg
 
     # Exit 0 means all is well. No Alert.
