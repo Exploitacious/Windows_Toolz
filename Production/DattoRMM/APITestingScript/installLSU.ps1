@@ -64,9 +64,6 @@ $Global:DiagMsg += "Executed On: " + $Date
 ##################################
 ######## Start of Script #########
 
-
-$System = Get-WmiObject WIN32_ComputerSystem  
-
 function Check-SoftwareInstall {
     param (
         [string]$SoftwareName,
@@ -94,6 +91,8 @@ function Check-SoftwareInstall {
         throw "Invalid method. Please use 'EQ' or 'NE'."
     }
 }
+
+$System = Get-WmiObject WIN32_ComputerSystem  
 
 $Global:DiagMsg += "Checking Manufacturer..."
 if ($System.Manufacturer -match "Lenovo") {

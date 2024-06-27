@@ -72,8 +72,6 @@ $Global:DiagMsg += "Executed On: " + $Date
 ##################################
 ######## Start of Script #########
 
-$System = Get-WmiObject WIN32_ComputerSystem  
-
 function Check-SoftwareInstall {
     param (
         [string]$SoftwareName,
@@ -102,18 +100,37 @@ function Check-SoftwareInstall {
     }
 }
 
-$Global:DiagMsg += "Checking for Lenovo System Update Software Install..."
-$SoftwareResult = Check-SoftwareInstall -SoftwareName $softwareName -Method $method
+# Params:
+$softwareName = "Lenovo System Update"
+$method = 'EQ'
+$System = Get-WmiObject WIN32_ComputerSystem  
 
-if (!$SoftwareResult) {
-    $Global:DiagMsg += "Update software is missing"
-    $Global:AlertMsg += "Lenovo System Update Software is missing"
+
+# Run
+if ($System.Manufacturer -match "Lenovo") {
+    $Global:DiagMsg += "Computer reported Manufacturer as " + $System.Manufacturer + " " + $System.Model
+
+    $Global:DiagMsg += "Checking for Lenovo System Update Software Install..."
+    $SoftwareResult = Check-SoftwareInstall -SoftwareName $softwareName -Method $method
+
+    if (!$SoftwareResult) {
+        $Global:DiagMsg += "Update software is missing"
+        $Global:AlertMsg += "Lenovo System Update Software is missing"
+    }
+    else {
+        $Global:DiagMsg += "Lenovo System Update is already Installed."
+    }
+
 }
 else {
-    $Global:DiagMsg += "Lenovo System Update is already Installed."
+    $Global:DiagMsg += "Computer reported as " + $System.Manufacturer + " " + $System.Model
+    $Global:DiagMsg += "Skipping all Lenovo Installation and updates."
+    write-DRMMAlert "LSU Not Applicable $Global:AlertHealthy"
+    write-DRMMDiag $Global:DiagMsg
+
+    # Exit 0 means all is well. No Alert.
+    Exit 0
 }
-
-
 
 ######## End of Script ###########
 ##################################
