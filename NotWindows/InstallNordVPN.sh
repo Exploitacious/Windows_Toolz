@@ -112,7 +112,7 @@ else
 fi
 
 # Start OpenVPN with the specified or random configuration file
-sudo openvpn --config "$USER_HOME/nordvpn-configs/ovpn_udp/$OVPN_FILE"
+sudo openvpn --config "$USER_HOME/nordvpn-configs/ovpn_udp/$OVPN_FILE" --auth-user-pass "$CREDENTIALS_FILE"
 check_error "Failed to start OpenVPN"
 
 echo "NordVPN connected successfully using OpenVPN"

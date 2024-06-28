@@ -20,4 +20,5 @@ Popular Links:
 
 # Setup my Linux Shell
 
+    sudo kali-tweaks (set up a few things first) then
     curl -s https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/NotWindows/ShellSetup.sh | sudo bash

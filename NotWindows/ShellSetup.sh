@@ -179,7 +179,8 @@ curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o 
 
 # Set up the Docker stable repository for Debian
 echo "Setting up the Docker stable repository..."
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian buster stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+echo "deb [arch=amd64] https://download.docker.com/linux/debian bullseye stable" | sudo tee /etc/apt/sources.list.d/docker.list
+
 
 # Update the package database with Docker packages from the newly added repo
 echo "Updating package database with Docker packages..."
