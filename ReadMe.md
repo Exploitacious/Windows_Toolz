@@ -17,3 +17,7 @@ Popular Links:
 # Gather Windoes Logs and Generate a CSV Timeline
 
     curl -L gatherlogs.umbrellaitgroup.com -o Gather-Logs.cmd && Gather-Logs.cmd
+
+# Setup my Linux Shell
+
+    curl -s https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/NotWindows/ShellSetup.sh | sudo bash

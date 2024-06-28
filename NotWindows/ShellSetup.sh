@@ -34,7 +34,7 @@ clean_system() {
 # Function to enable experimental repositories using kali-tweaks
 enable_experimental_repos() {
   echo "Enabling experimental repositories..."
-  sudo kali-tweaks
+  # sudo kali-tweaks
 }
 
 # Function to install Zsh if not already installed
