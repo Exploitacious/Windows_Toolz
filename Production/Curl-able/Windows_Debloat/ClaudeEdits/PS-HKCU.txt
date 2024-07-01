@@ -1,0 +1,114 @@
+# Windows User-Specific Customization Script
+# ==========================================
+# This script optimizes Windows 10/11 user settings by:
+# 1. Disabling Cortana and Bing Search
+# 2. Removing application suggestions and Start Menu tiles
+# 3. Customizing taskbar and system tray
+# 4. Adjusting privacy settings
+# 5. Modifying various UI elements
+# 6. Applying specific Windows 11 tweaks (if applicable)
+#
+# Note: This script modifies user-specific registry settings and does not require admin rights.
+# ==========================================
+
+# Discovery
+$isWin11 = (Get-WmiObject Win32_OperatingSystem).Caption -Match "Windows 11"
+$NotificationColor = 'Yellow'
+
+# Function to add or modify registry keys
+function Set-UserRegistryValue {
+	param (
+		[string]$Path,
+		[string]$Name,
+		[string]$Value,
+		[string]$Type = "DWord"
+	)
+    
+	if (!(Test-Path $Path)) {
+		New-Item -Path $Path -Force | Out-Null
+	}
+	Set-ItemProperty -Path $Path -Name $Name -Value $Value -Type $Type
+}
+
+# 1. Disable Cortana and Bing Search
+Write-Host -ForegroundColor $NotificationColor "Disabling Cortana and Bing Search..."
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Personalization\Settings" -Name "AcceptedPrivacyPolicy" -Value 0
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\InputPersonalization" -Name "RestrictImplicitTextCollection" -Value 1
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\InputPersonalization" -Name "RestrictImplicitInkCollection" -Value 1
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\InputPersonalization\TrainedDataStore" -Name "HarvestContacts" -Value 0
+Set-UserRegistryValue -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowCortanaButton" -Value 0
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "BingSearchEnabled" -Value 0
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "CortanaConsent" -Value 0
+
+if (-not $isWin11) {
+	Set-WindowsSearchSetting -EnableWebResultsSetting $false
+}
+
+# 2. Remove application suggestions and Start Menu tiles
+Write-Host -ForegroundColor $NotificationColor "Removing application suggestions and Start Menu tiles..."
+$contentDeliveryPaths = @(
+	"ContentDeliveryAllowed", "OemPreInstalledAppsEnabled", "PreInstalledAppsEnabled",
+	"PreInstalledAppsEverEnabled", "SilentInstalledAppsEnabled", "SystemPaneSuggestionsEnabled"
+)
+$subscribedContent = @(
+	"310093", "314559", "338387", "338388", "338389", "338393", "353694", "353696", "353698"
+)
+
+foreach ($path in $contentDeliveryPaths) {
+	Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name $path -Value 0
+}
+
+foreach ($content in $subscribedContent) {
+	Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SubscribedContent-${content}Enabled" -Value 0
+}
+
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement" -Name "ScoobeSystemSettingEnabled" -Value 0
+
+# Unpin Start Menu tiles
+$buildVersion = [System.Environment]::OSVersion.Version.Build
+if ($buildVersion -ge 15063 -and $buildVersion -le 16299) {
+	Get-ChildItem -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\CloudStore\Store\Cache\DefaultAccount" -Include "*.group" -Recurse | ForEach-Object {
+		$data = (Get-ItemProperty -Path "$($_.PsPath)\Current" -Name "Data").Data -Join ","
+		$data = $data.Substring(0, $data.IndexOf(",0,202,30") + 9) + ",0,202,80,0,0"
+		Set-ItemProperty -Path "$($_.PsPath)\Current" -Name "Data" -Type Binary -Value $data.Split(",")
+	}
+}
+elseif ($buildVersion -ge 17134) {
+	$key = Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\CloudStore\Store\Cache\DefaultAccount\*start.tilegrid`$windows.data.curatedtilecollection.tilecollection\Current"
+	$data = $key.Data[0..25] + ([byte[]](202, 50, 0, 226, 44, 1, 1, 0, 0))
+	Set-ItemProperty -Path $key.PSPath -Name "Data" -Type Binary -Value $data
+	Stop-Process -Name "ShellExperienceHost" -Force -ErrorAction SilentlyContinue
+}
+
+# 3. Customize taskbar and system tray
+Write-Host -ForegroundColor $NotificationColor "Customizing taskbar and system tray..."
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Value 1
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\People" -Name "PeopleBand" -Value 0
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds" -Name "ShellFeedsTaskbarViewMode" -Value 2
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds" -Name "HeadlinesOnboardingComplete" -Value 1
+
+# 4. Adjust privacy settings
+Write-Host -ForegroundColor $NotificationColor "Adjusting privacy settings..."
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Siuf\Rules" -Name "NumberOfSIUFInPeriod" -Value 0
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy" -Name "01" -Value 1
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy" -Name "StoragePoliciesNotified" -Value 1
+Set-UserRegistryValue -Path "HKCU:\Software\Policies\Microsoft\Windows\OOBE" -Name "DisablePrivacyExperience" -Value 1
+
+# 5. Modify various UI elements
+Write-Host -ForegroundColor $NotificationColor "Modifying UI elements..."
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel" -Name "StartupPage" -Value 1
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel" -Name "AllItemsIconView" -Value 1
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\GameBar" -Name "AutoGameModeEnabled" -Value 0
+Set-UserRegistryValue -Path "HKCU:\System\GameConfigStore" -Name "GameDVR_Enabled" -Value 0
+Set-UserRegistryValue -Path "HKCU:\Software\Microsoft\Clipboard" -Name "EnableClipboardHistory" -Value 1
+
+# 6. Apply Windows 11 specific tweaks
+if ($isWin11) {
+	Write-Host -ForegroundColor Green "Applying Windows 11 specific tweaks..."
+	Start-Sleep 3
+	cmd.exe /c "C:\Temp\Cleanup\Cmd-HKCU.cmd"
+}
+
+Write-Host -ForegroundColor Green "User-specific customization complete."
+Write-Host "Please sign out and sign in again for all changes to take effect."

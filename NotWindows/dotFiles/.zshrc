@@ -111,6 +111,10 @@ alias hc="history -c" # clear history
 alias hg="history | grep " # +command
 alias ag="alias | grep " # +command
 alias sapu='sudo apt-get update'
+alias ls='ls -alFh --color=auto --time-style=long-iso'
+alias ll='ls -alFh --color=auto --time-style=long-iso'
+alias cd..='cd ..'
+alias cd...='cd .. && cd ..'
 #Utilities
 alias connectnord='sudo /usr/local/bin/launch_nordvpn'
 alias desktop='kex --win -s'

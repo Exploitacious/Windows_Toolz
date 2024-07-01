@@ -1,0 +1,128 @@
+@echo off
+setlocal enabledelayedexpansion
+
+REM =====================================================
+REM Windows Customization Script
+REM =====================================================
+REM This script modifies various Windows settings to:
+REM 1. Disable app suggestions and automatic app installations
+REM 2. Customize desktop, taskbar, and notifications
+REM 3. Adjust privacy settings
+REM 4. Optimize visual performance
+REM 5. Modify lock screen settings
+REM 6. Customize Windows 11 specific features
+REM 7. Reset Start menu layout
+REM
+REM Note: This script modifies registry settings. Use with caution.
+REM =====================================================
+
+REM Function to add or modify registry keys
+:AddOrUpdateReg
+reg add %1 /v %2 /t %3 /d %4 /f >nul 2>&1
+goto :eof
+
+REM =====================================================
+REM 1. Disable app suggestions and automatic app installations
+REM =====================================================
+
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" "SilentInstalledAppsEnabled" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" "SystemPaneSuggestionsEnabled" REG_DWORD 0
+
+REM Disable various subscribed content
+for %%i in (338393 353694 353696 338388 338389) do (
+    call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" "SubscribedContent-%%iEnabled" REG_DWORD 0
+)
+
+REM =====================================================
+REM 2. Customize desktop, taskbar, and notifications
+REM =====================================================
+
+REM Hide News and interests in the taskbar
+call :AddOrUpdateReg "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Feeds" "ShellFeedsTaskbarViewMode" REG_DWORD 2
+
+REM Remove Search, Task View, and People buttons from taskbar
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\Search" "SearchboxTaskbarMode" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "ShowTaskViewButton" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\People" "PeopleBand" REG_DWORD 0
+
+REM Open File Explorer to This PC instead of Quick Access
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "LaunchTo" REG_DWORD 1
+
+REM Hide Meet Now icon in the taskbar
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" "HideSCAMeetNow" REG_DWORD 1
+
+REM =====================================================
+REM 3. Adjust privacy settings
+REM =====================================================
+
+REM Disable various privacy-related features
+call :AddOrUpdateReg "HKCU\Control Panel\International\User Profile" "HttpAcceptLanguageOptOut" REG_DWORD 1
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "Start_TrackProgs" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy" "HasAccepted" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\Software\Microsoft\InputPersonalization" "RestrictImplicitInkCollection" REG_DWORD 1
+call :AddOrUpdateReg "HKCU\Software\Microsoft\InputPersonalization" "RestrictImplicitTextCollection" REG_DWORD 1
+call :AddOrUpdateReg "HKCU\Software\Microsoft\InputPersonalization\TrainedDataStore" "HarvestContacts" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Personalization\Settings" "AcceptedPrivacyPolicy" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Input\TIPC" "Enabled" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\Privacy" "TailoredExperiencesWithDiagnosticDataEnabled" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location" "Value" REG_SZ "Deny"
+
+REM Disable feedback requests
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Siuf\Rules" "NumberOfSIUFInPeriod" REG_DWORD 0
+
+REM =====================================================
+REM 4. Optimize visual performance
+REM =====================================================
+
+REM Disable various visual effects for performance
+call :AddOrUpdateReg "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" "VisualFXSetting" REG_DWORD 3
+call :AddOrUpdateReg "HKCU\SOFTWARE\Microsoft\Windows\DWM" "EnableAeroPeek" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\SOFTWARE\Microsoft\Windows\DWM" "AlwaysHiberNateThumbnails" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "IconsOnly" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "ListviewAlphaSelect" REG_DWORD 1
+call :AddOrUpdateReg "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "ListviewShadow" REG_DWORD 1
+call :AddOrUpdateReg "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "TaskbarAnimations" REG_DWORD 0
+
+REM =====================================================
+REM 5. Modify lock screen settings
+REM =====================================================
+
+REM Disable rotating lock screen
+call :AddOrUpdateReg "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" "RotatingLockScreenOverlayEnabled" REG_DWORD 0
+
+REM =====================================================
+REM 6. Customize Windows 11 specific features
+REM =====================================================
+
+REM Align taskbar to the left
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "TaskbarAl" REG_DWORD 0
+
+REM Remove Widgets, Chat, and Copilot buttons from taskbar
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "TaskbarDa" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "TaskbarMn" REG_DWORD 0
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "ShowCopilotButton" REG_DWORD 0
+
+REM Disable transparency
+call :AddOrUpdateReg "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" "EnableTransparency" REG_DWORD 0
+
+REM Show hidden icon menu on taskbar corner
+call :AddOrUpdateReg "HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\TrayNotify" "SystemTrayChevronVisibility" REG_DWORD 1
+
+REM Disable "Show more options" context menu
+reg add "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /f /ve >nul 2>&1
+
+REM =====================================================
+REM 7. Reset Start menu layout
+REM =====================================================
+
+REM Remove previous app suggestions in Start
+reg delete "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\CloudStore\Store\Cache\DefaultAccount" /f >nul 2>&1
+
+REM =====================================================
+REM Restart Explorer to apply changes
+REM =====================================================
+
+taskkill /f /im explorer.exe >nul 2>&1
+start explorer.exe
+
+echo Windows customization complete. Please restart your computer for all changes to take effect.

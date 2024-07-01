@@ -1,0 +1,133 @@
+# Combined HKCU Optimization Script
+# =================================
+# This script combines PS-HKCU and Cmd-HKCU functionalities
+# and ensures it only runs once per user.
+
+# Check if the script has already been run for this user
+$flagFile = "$env:USERPROFILE\.hkcu_optimization_complete"
+if (Test-Path $flagFile) {
+    Write-Host "HKCU optimizations have already been applied for this user. Exiting."
+    exit
+}
+
+# Function to add or modify registry keys
+function Set-RegistryValue {
+    param (
+        [string]$Path,
+        [string]$Name,
+        [string]$Value,
+        [string]$Type = "DWORD"
+    )
+    
+    if (!(Test-Path $Path)) {
+        New-Item -Path $Path -Force | Out-Null
+    }
+    Set-ItemProperty -Path $Path -Name $Name -Value $Value -Type $Type
+}
+
+# 1. Disable Cortana and Bing Search
+Write-Host "Disabling Cortana and Bing Search..."
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Personalization\Settings" -Name "AcceptedPrivacyPolicy" -Value 0
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\InputPersonalization" -Name "RestrictImplicitTextCollection" -Value 1
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\InputPersonalization" -Name "RestrictImplicitInkCollection" -Value 1
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\InputPersonalization\TrainedDataStore" -Name "HarvestContacts" -Value 0
+Set-RegistryValue -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowCortanaButton" -Value 0
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "BingSearchEnabled" -Value 0
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "CortanaConsent" -Value 0
+
+# 2. Remove application suggestions and Start Menu tiles
+Write-Host "Removing application suggestions and Start Menu tiles..."
+$contentDeliveryPaths = @(
+    "ContentDeliveryAllowed", "OemPreInstalledAppsEnabled", "PreInstalledAppsEnabled",
+    "PreInstalledAppsEverEnabled", "SilentInstalledAppsEnabled", "SystemPaneSuggestionsEnabled"
+)
+$subscribedContent = @(
+    "310093", "314559", "338387", "338388", "338389", "338393", "353694", "353696", "353698"
+)
+
+foreach ($path in $contentDeliveryPaths) {
+    Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name $path -Value 0
+}
+
+foreach ($content in $subscribedContent) {
+    Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SubscribedContent-${content}Enabled" -Value 0
+}
+
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement" -Name "ScoobeSystemSettingEnabled" -Value 0
+
+# 3. Customize taskbar and system tray
+Write-Host "Customizing taskbar and system tray..."
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Value 1
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\People" -Name "PeopleBand" -Value 0
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds" -Name "ShellFeedsTaskbarViewMode" -Value 2
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds" -Name "HeadlinesOnboardingComplete" -Value 1
+
+# 4. Adjust privacy settings
+Write-Host "Adjusting privacy settings..."
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Siuf\Rules" -Name "NumberOfSIUFInPeriod" -Value 0
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy" -Name "01" -Value 1
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy" -Name "StoragePoliciesNotified" -Value 1
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location" -Name "Value" -Value "Deny" -Type "String"
+
+# 5. Modify various UI elements
+Write-Host "Modifying UI elements..."
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel" -Name "StartupPage" -Value 1
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel" -Name "AllItemsIconView" -Value 1
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\GameBar" -Name "AutoGameModeEnabled" -Value 0
+Set-RegistryValue -Path "HKCU:\System\GameConfigStore" -Name "GameDVR_Enabled" -Value 0
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Clipboard" -Name "EnableClipboardHistory" -Value 1
+
+# 6. Windows 11 specific tweaks
+$isWin11 = [System.Environment]::OSVersion.Version.Build -ge 22000
+if ($isWin11) {
+    Write-Host "Applying Windows 11 specific tweaks..."
+    # Align taskbar to the left
+    Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0
+    # Remove Widgets, Chat, and Copilot buttons from taskbar
+    Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0
+    Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarMn" -Value 0
+    Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowCopilotButton" -Value 0
+    # Disable transparency
+    Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value 0
+}
+
+# 7. Additional optimizations from Cmd-HKCU
+Write-Host "Applying additional optimizations..."
+Set-RegistryValue -Path "HKCU:\Control Panel\International\User Profile" -Name "HttpAcceptLanguageOptOut" -Value 1
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Start_TrackProgs" -Value 0
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy" -Name "HasAccepted" -Value 0
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Privacy" -Name "TailoredExperiencesWithDiagnosticDataEnabled" -Value 0
+
+# Disable various visual effects for performance
+Set-RegistryValue -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" -Name "VisualFXSetting" -Value 3
+Set-RegistryValue -Path "HKCU:\SOFTWARE\Microsoft\Windows\DWM" -Name "EnableAeroPeek" -Value 0
+Set-RegistryValue -Path "HKCU:\SOFTWARE\Microsoft\Windows\DWM" -Name "AlwaysHiberNateThumbnails" -Value 0
+Set-RegistryValue -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "IconsOnly" -Value 0
+Set-RegistryValue -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ListviewAlphaSelect" -Value 1
+Set-RegistryValue -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ListviewShadow" -Value 1
+Set-RegistryValue -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAnimations" -Value 0
+
+# Disable rotating lock screen
+Set-RegistryValue -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "RotatingLockScreenOverlayEnabled" -Value 0
+
+# Show hidden icon menu on taskbar corner
+Set-RegistryValue -Path "HKCU:\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\TrayNotify" -Name "SystemTrayChevronVisibility" -Value 1
+
+# Disable "Show more options" context menu (Windows 11)
+if ($isWin11) {
+    New-Item -Path "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -Force | Out-Null
+    Set-ItemProperty -Path "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -Name "(Default)" -Value "" -Type String
+}
+
+# Remove previous app suggestions in Start
+Remove-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\CloudStore\Store\Cache\DefaultAccount" -Recurse -Force -ErrorAction SilentlyContinue
+
+# Restart Explorer to apply changes
+Stop-Process -Name "explorer" -Force -ErrorAction SilentlyContinue
+Start-Process "explorer.exe"
+
+# Create flag file to indicate script has run
+New-Item -Path $flagFile -ItemType File -Force | Out-Null
+
+Write-Host "HKCU optimizations completed successfully."

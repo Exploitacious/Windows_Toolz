@@ -1,0 +1,54 @@
+@echo off
+setlocal enabledelayedexpansion
+
+:CheckAdmin
+    openfiles >nul 2>&1
+    if %errorlevel% NEQ 0 (
+        echo Requesting administrative privileges...
+        goto UACPrompt
+    ) else (
+        goto GotAdmin
+    )
+
+:UACPrompt
+    echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\getadmin.vbs"
+    echo UAC.ShellExecute "%~s0", "", "", "runas", 1 >> "%temp%\getadmin.vbs"
+    "%temp%\getadmin.vbs"
+    exit /B
+
+:GotAdmin
+    if exist "%temp%\getadmin.vbs" ( del "%temp%\getadmin.vbs" )
+    pushd "%CD%"
+    CD /D "%~dp0"
+
+:Download
+    set "baseURL=https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/"
+    set "tempDir=C:\Temp\Cleanup"
+    mkdir "%tempDir%" 2>nul
+
+    for %%f in (Main-Stager.ps1 UninstallBloat.ps1 PSandWindowsUpdates.ps1 InstallNewApps.ps1 PS-HKLM.ps1 Cmd-HKLM.cmd combined-hkcu-script.ps1) do (
+        call :DownloadFile "%%f"
+    )
+
+    goto RunPowerShell
+
+:DownloadFile
+    set "retries=3"
+    :DownloadRetry
+    PowerShell -Command "(New-Object Net.WebClient).DownloadFile('%baseURL%%~1', '%tempDir%\%~1')"
+    if %errorlevel% NEQ 0 (
+        set /a retries-=1
+        if !retries! GTR 0 (
+            echo Download failed. Retrying...
+            goto DownloadRetry
+        ) else (
+            echo Failed to download %~1 after multiple attempts.
+            exit /b 1
+        )
+    )
+    exit /b 0
+
+:RunPowerShell
+    PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '%tempDir%\Main-Stager.ps1'"
+
+exit /b

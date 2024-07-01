@@ -23,14 +23,12 @@ This collection of PowerShell scripts is designed to optimize and customize Wind
 
 **Key Functions**:
 
-- Enhances privacy and security settings
-- Disables telemetry and data collection
-- Customizes UI and UX settings
-- Optimizes system performance
-- Removes pre-installed bloatware
-- Installs specified applications using Winget
-- Updates PowerShell modules and Windows
-- Creates a first-time logon script for new user profiles
+- Disables Cortana and Bing Search
+- Removes application suggestions and Start Menu tiles
+- Customizes taskbar and system tray
+- Adjusts privacy settings
+- Modifies various UI elements
+- Applies specific Windows 11 tweaks (if applicable)
 
 ### 3. Winget Application Installation Script
 
@@ -99,9 +97,3 @@ Modify these sections as needed for your environment.
 - Make sure you download BOTH the FirstLogon.bat file and DebloatScript-HKCU.ps1 into the same directory as the main System Debloat Script.
 - A copy of the Bat and HKCU will be placed in C:\Windows\FirstUserLogon and ran every time a user logs in for the FIRST TIME ONLY.
 - This 'mini' script cleans up the user interface and removes some of the clutter that Windows 10 likes to throw at you.
-
-### More Information
-
-1Click-1Line-Launcher: The entry point that downloads and sets up the other scripts.
-Main-Stager: Orchestrates the execution of other scripts in the correct order.
-Various optimization scripts: Handle system-wide and user-specific customizations, bloatware removal, application installation, and Windows updates.

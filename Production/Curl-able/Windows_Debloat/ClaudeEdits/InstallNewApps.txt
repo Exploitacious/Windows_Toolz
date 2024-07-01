@@ -1,0 +1,91 @@
+# Winget Application Installation Script
+# ======================================
+# This script performs the following tasks:
+# 1. Elevates to admin privileges if necessary
+# 2. Installs Winget Auto-Update (WAU)
+# 3. Installs a predefined list of applications using Winget
+#
+# Note: This script requires administrative privileges to run.
+# ======================================
+
+# Verify/Elevate Admin Session
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    exit
+}
+
+# Define list of applications to install
+$InstallPrograms = @(
+    "Company Portal"
+    "9N0DX20HK701" # Windows Terminal
+    "9NRX63209R7B" # Outlook (NEW) for Windows
+    "Adobe.Acrobat.Reader.64-bit"
+    "7zip.7zip"
+    "Zoom.Zoom"
+    "Microsoft.Teams" # Microsoft Teams (New)
+)
+
+# Function to install Winget Auto-Update (WAU)
+function Install-WingetAutoUpdate {
+    $WAUPath = "C:\Temp\WAU_Latest"
+    $WAUUrl = "https://github.com/Romanitho/Winget-AutoUpdate/zipball/master/"
+    $WAUFile = "$WAUPath\WAU_latest.zip"
+
+    Write-Host "Installing Winget Auto-Update..."
+
+    # Refresh or create WAU directory
+    if (Test-Path -Path $WAUPath) {
+        Remove-Item $WAUPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    New-Item -ItemType Directory -Path $WAUPath -Force | Out-Null
+
+    # Download and extract WAU
+    Invoke-WebRequest -Uri $WAUUrl -OutFile $WAUFile
+    Expand-Archive $WAUFile -DestinationPath $WAUPath -Force
+    Remove-Item $WAUFile -Force
+
+    # Move files and clean up
+    Move-Item "$WAUPath\Romanitho*\*" $WAUPath
+    Remove-Item "$WAUPath\Romanitho*\" -Recurse -Force
+
+    # Install WAU
+    & "$WAUPath\Sources\WAU\Winget-AutoUpdate-Install.ps1" -Silent -InstallUserContext -NotificationLevel None -UpdatesAtLogon -UpdatesInterval Daily -DoNotUpdate
+}
+
+# Function to install applications using Winget
+function Install-WingetApps {
+    param (
+        [array]$AppList
+    )
+
+    Write-Host "Installing Applications..."
+    foreach ($app in $AppList) {
+        $listApp = winget list --exact -q $app --accept-source-agreements --accept-package-agreements
+        if (![String]::Join("", $listApp).Contains($app)) {
+            Write-Host "Installing: $app" -ForegroundColor Green
+            winget install -e -h --accept-source-agreements --accept-package-agreements --id $app 
+        }
+        else {
+            Write-Host "$app already installed."
+        }
+    }
+}
+
+# Main execution
+try {
+    Write-Host "Starting Winget and application installation process..." -ForegroundColor Green
+    
+    # Install Winget Auto-Update
+    Install-WingetAutoUpdate
+
+    # Install specified applications
+    Install-WingetApps -AppList $InstallPrograms
+
+    Write-Host "Installation process completed successfully." -ForegroundColor Green
+}
+catch {
+    Write-Host "An error occurred during the installation process: $_" -ForegroundColor Red
+}
+finally {
+    Read-Host -Prompt "Press Enter to exit"
+}

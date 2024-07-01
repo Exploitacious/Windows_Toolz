@@ -202,4 +202,4 @@ if ($connectionSummary.Count -gt 0) {
     $connectionSummary | Format-Table -AutoSize
 }
 
-Read-Host "`nScript execution completed. Please review the summaries above for any issues. Press Enter to Exit"
+Read-Host "`nScript execution completed. Please review the summaries above for any issues. Press Enter to continue"

@@ -1,0 +1,106 @@
+# Main-Stager Script with Rollback Mechanism
+# ==========================================
+
+$ErrorActionPreference = "Stop"
+$logFile = "C:\Temp\Cleanup\optimization_log.txt"
+$restorePointName = "Pre-Optimization-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+$rollbackScriptPath = "C:\Temp\Cleanup\rollback_script.ps1"
+
+function Log-Message {
+    param([string]$message)
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    "$timestamp - $message" | Out-File -Append -FilePath $logFile
+    Write-Host $message
+}
+
+function Create-RestorePoint {
+    Log-Message "Creating system restore point: $restorePointName"
+    Checkpoint-Computer -Description $restorePointName -RestorePointType "MODIFY_SETTINGS"
+}
+
+function Run-Script {
+    param([string]$scriptName)
+    try {
+        Log-Message "Starting $scriptName"
+        & "C:\Temp\Cleanup\$scriptName"
+        Log-Message "$scriptName completed successfully"
+    }
+    catch {
+        Log-Message "Error in $scriptName: $_"
+        throw
+    }
+}
+
+function Create-RollbackScript {
+    $rollbackContent = @"
+# Rollback Script
+# ===============
+Write-Host "Rolling back system changes..."
+
+# Restore to the pre-optimization restore point
+$restorePoints = Get-ComputerRestorePoint
+$targetRestorePoint = $restorePoints | Where-Object { `$_.Description -eq "$restorePointName" } | Select-Object -First 1
+
+if (`$targetRestorePoint) {
+    Write-Host "Restoring to point: $restorePointName"
+    Restore-Computer -RestorePoint `$targetRestorePoint.SequenceNumber -Confirm:`$false
+    Write-Host "System restored to pre-optimization state."
+    Write-Host "Please restart your computer for changes to take effect."
+} else {
+    Write-Host "Restore point not found. Manual intervention may be required."
+}
+
+# Remove the HKCU optimization flag for all users
+Get-ChildItem "C:\Users" -Directory | ForEach-Object {
+    Remove-Item "`$(`$_.FullName)\.hkcu_optimization_complete" -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "HKCU optimization flags removed. User-specific changes will be reapplied on next login."
+
+# Additional rollback steps can be added here if needed
+
+Read-Host -Prompt "Press Enter to exit"
+"@
+
+    $rollbackContent | Out-File -FilePath $rollbackScriptPath -Encoding utf8
+    Log-Message "Rollback script created at $rollbackScriptPath"
+}
+
+try {
+    Log-Message "Starting Windows optimization process"
+
+    # Create system restore point
+    Create-RestorePoint
+
+    # Create rollback script
+    Create-RollbackScript
+
+    # Run optimization scripts
+    Run-Script "UninstallBloat.ps1"
+    Start-Sleep -Seconds 30
+
+    Run-Script "PSandWindowsUpdates.ps1"
+    Start-Sleep -Seconds 180
+
+    Run-Script "InstallNewApps.ps1"
+    Start-Sleep -Seconds 60
+
+    Run-Script "PS-HKLM.ps1"
+    Run-Script "Cmd-HKLM.cmd"
+
+    # Set up first logon script for new user profiles
+    $logonScriptPath = "C:\Windows\System32\GroupPolicy\User\Scripts\Logon"
+    New-Item -Path $logonScriptPath -ItemType Directory -Force | Out-Null
+    Copy-Item "C:\Temp\Cleanup\combined-hkcu-script.ps1" $logonScriptPath
+
+    # Create a registry entry to run the script on user logon
+    New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Group Policy\Scripts\Logon" -Name "1" -Value "combined-hkcu-script.ps1" -PropertyType String -Force
+
+    Log-Message "Windows optimization process completed successfully"
+    Log-Message "A rollback script has been created at $rollbackScriptPath if needed"
+}
+catch {
+    Log-Message "Critical error in optimization process: $_"
+    Log-Message "Consider running the rollback script at $rollbackScriptPath"
+    exit 1
+}

@@ -1,0 +1,172 @@
+# Windows PowerShell System-wide Customization Script
+# ===================================================
+# This script optimizes Windows 10/11 for business environments by:
+# 1. Enhancing privacy and security
+# 2. Disabling telemetry and data collection
+# 3. Customizing UI and UX settings
+# 4. Optimizing system performance
+# 5. Configuring Windows features
+# 6. Applying specific Windows 11 optimizations (if applicable)
+#
+# Note: This script modifies system-wide registry settings. Use with caution.
+# ===================================================
+
+# Verify/Elevate Admin Session
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+	Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+	exit
+}
+
+# Discovery
+$isWin11 = (Get-WmiObject Win32_OperatingSystem).Caption -Match "Windows 11"
+
+# Set Variables
+$ErrorActionPreference = 'SilentlyContinue'
+$NotificationColor = 'Yellow'
+
+# Function to add or modify registry keys
+function Set-RegistryValue {
+	param (
+		[string]$Path,
+		[string]$Name,
+		[string]$Value,
+		[string]$Type = "DWORD"
+	)
+    
+	if (!(Test-Path $Path)) {
+		New-Item -Path $Path -Force | Out-Null
+	}
+	Set-ItemProperty -Path $Path -Name $Name -Value $Value -Type $Type -Force
+}
+
+# 1. Enhance privacy and security
+Write-Host -ForegroundColor $NotificationColor "Enhancing privacy and security..."
+
+# Enable PowerShell logging
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -Value 1
+
+# Disable telemetry
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Value 0
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" -Name "AllowTelemetry" -Value 0
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Policies\DataCollection" -Name "AllowTelemetry" -Value 0
+
+# Disable Windows Preview Builds
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PreviewBuilds" -Name "AllowBuildPreview" -Value 0
+
+# Disable Windows License Telemetry
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\CurrentVersion\Software Protection Platform" -Name "NoGenTicket" -Value 1
+
+# 2. Disable telemetry and data collection
+Write-Host -ForegroundColor $NotificationColor "Disabling telemetry and data collection..."
+
+# Disable Customer Experience Improvement Program
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\SQMClient\Windows" -Name "CEIPEnable" -Value 0
+
+# Disable App Telemetry
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\AppCompat" -Name "AITEnable" -Value 0
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\AppCompat" -Name "DisableInventory" -Value 1
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\AppV\CEIP" -Name "CEIPEnable" -Value 0
+
+# Disable Tablet PC features
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\TabletPC" -Name "PreventHandwritingDataSharing" -Value 1
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\TextInput" -Name "AllowLinguisticDataCollection" -Value 0
+
+# 3. Customize UI and UX settings
+Write-Host -ForegroundColor $NotificationColor "Customizing UI and UX settings..."
+
+# Disable Cortana
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search" -Name "AllowCortana" -Value 0
+
+# Disable Wi-Fi Sense
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Microsoft\WcmSvc\wifinetworkmanager\config" -Name "AutoConnectAllowedOEM" -Value 0
+
+# Hide Windows Defender SysTray icon
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray" -Name "HideSystray" -Value 1
+
+# 4. Optimize system performance
+Write-Host -ForegroundColor $NotificationColor "Optimizing system performance..."
+
+# Disable IPv6 stack
+Disable-NetAdapterBinding -Name "*" -ComponentID "ms_tcpip6"
+
+# Enable Windows Update automatic downloads
+Remove-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AUOptions" -ErrorAction SilentlyContinue
+
+# Enable System Restore
+vssadmin Resize ShadowStorage /On=$env:SYSTEMDRIVE /For=$env:SYSTEMDRIVE /MaxSize=10GB
+Enable-ComputerRestore -Drive "$env:SYSTEMDRIVE"
+
+# Enable Superfetch and Windows Search indexing
+Set-Service "SysMain" -StartupType Automatic
+Start-Service "SysMain"
+Set-Service "WSearch" -StartupType Automatic
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\WSearch" -Name "DelayedAutoStart" -Type DWord -Value 1
+Start-Service "WSearch"
+
+# 5. Configure Windows features
+Write-Host -ForegroundColor $NotificationColor "Configuring Windows features..."
+
+# Disable Fast Startup
+Set-RegistryValue -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power" -Name "HiberbootEnabled" -Value 0
+
+# Enable verbose startup/shutdown messages
+Set-RegistryValue -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -Name "VerboseStatus" -Value 1
+
+# Disable Xbox features
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR" -Name "AllowGameDVR" -Value 0
+
+# Disable First Logon Animation
+Set-RegistryValue -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableFirstLogonAnimation" -Value 0
+
+# 6. Apply Windows 11 specific optimizations
+if ($isWin11) {
+	Write-Host -ForegroundColor $NotificationColor "Applying Windows 11 specific optimizations..."
+    
+	# Disable Widgets
+	Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Dsh" -Name "AllowNewsAndInterests" -Value 0
+    
+	# Remove Weather Taskbar Widget
+	Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Feeds" -Name "EnableFeeds" -Value 0
+    
+	# Disable "Show more options" context menu
+	Set-RegistryValue -Path "HKLM:\SOFTWARE\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -Name "(Default)" -Value "" -Type String
+}
+
+# Disable unnecessary scheduled tasks
+Write-Host -ForegroundColor $NotificationColor "Disabling unnecessary scheduled tasks..."
+$tasksToDisable = @(
+	"Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser",
+	"Microsoft\Windows\Application Experience\ProgramDataUpdater",
+	"Microsoft\Windows\Autochk\Proxy",
+	"Microsoft\Windows\Customer Experience Improvement Program\Consolidator",
+	"Microsoft\Windows\Customer Experience Improvement Program\UsbCeip",
+	"Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector",
+	"Microsoft\Windows\Power Efficiency Diagnostics\AnalyzeSystem",
+	"Microsoft\Windows\RemoteAssistance\RemoteAssistanceTask",
+	"Microsoft\Windows\RetailDemo\CleanupOfflineContent",
+	"Microsoft\Office\Office ClickToRun Service Monitor",
+	"Microsoft\Office\OfficeTelemetryAgentFallBack2016",
+	"Microsoft\Office\OfficeTelemetryAgentLogOn2016"
+)
+
+foreach ($task in $tasksToDisable) {
+	Disable-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue | Out-Null
+}
+
+# Adobe AI Remediation
+Write-Host -ForegroundColor $NotificationColor "Applying Adobe AI Remediation..."
+$adobeReaderPath = 'HKLM:SOFTWARE\Policies\Adobe\Acrobat Reader\DC\FeatureLockDown'
+$adobeDCPath = 'HKLM:SOFTWARE\Policies\Adobe\Adobe Acrobat\DC\FeatureLockDown'
+
+if (Test-Path $adobeReaderPath) {
+	Set-RegistryValue -Path $adobeReaderPath -Name "bEnableFlash" -Value 0
+	Set-RegistryValue -Path $adobeReaderPath -Name "bDisableJavaScript" -Value 1
+}
+
+if (Test-Path $adobeDCPath) {
+	Set-RegistryValue -Path $adobeDCPath -Name "bDisableJavaScript" -Value 1
+}
+
+Write-Host -ForegroundColor Green "Windows system-wide customization complete."
+Write-Host "Please restart your computer for all changes to take effect."
+Read-Host -Prompt "Press Enter to exit"

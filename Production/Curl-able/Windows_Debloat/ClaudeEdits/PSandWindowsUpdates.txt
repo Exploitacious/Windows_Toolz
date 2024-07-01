@@ -1,0 +1,92 @@
+# PowerShell Module and Windows Update Script
+# ===========================================
+# This script performs the following tasks:
+# 1. Elevates to admin privileges if necessary
+# 2. Configures PowerShell Gallery and NuGet
+# 3. Updates existing PowerShell modules
+# 4. Installs new specified PowerShell modules
+# 5. Runs Windows Updates
+#
+# Note: This script requires administrative privileges to run.
+# ===========================================
+
+# Verify/Elevate Admin Session
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    exit
+}
+
+# Configure TLS and PowerShell Gallery
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 
+Register-PSRepository -Default -ErrorAction SilentlyContinue
+Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted -ErrorAction SilentlyContinue
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Scope AllUsers -Force -ErrorAction SilentlyContinue
+Install-Module PowerShellGet -MinimumVersion 2.2.4 -Scope AllUsers -Force -ErrorAction SilentlyContinue
+
+# Get all installed modules and add new modules to install
+$Modules = @(Get-InstalledModule | Select-Object -ExpandProperty "Name") + @("PSWindowsUpdate")
+
+function Update-PSModule {
+    param (
+        [string]$ModuleName
+    )
+
+    $CurrentModule = Find-Module -Name $ModuleName
+    $InstalledVersions = Get-InstalledModule -Name $ModuleName -AllVersions -ErrorAction SilentlyContinue
+
+    if ($null -eq $InstalledVersions) {
+        Write-Host "Installing $ModuleName from PowerShellGallery. Version: $($CurrentModule.Version). Release date: $($CurrentModule.PublishedDate)"
+        Install-Module -Name $ModuleName -Force
+    }
+    elseif ($InstalledVersions.Count -eq 1 -and $InstalledVersions.Version -eq $CurrentModule.Version) {
+        Write-Host -ForegroundColor Green "$ModuleName is up to date. Version: $($InstalledVersions.Version). Release date: $($CurrentModule.PublishedDate)"
+    }
+    elseif ($InstalledVersions.Count -gt 1) {
+        Write-Host "$ModuleName has multiple versions installed. Removing old versions and updating to latest."
+        $InstalledVersions | Where-Object { $_.Version -ne $CurrentModule.Version } | Uninstall-Module -Force
+        Install-Module -Name $ModuleName -Force
+    }
+    else {
+        Write-Host "Updating $ModuleName from version $($InstalledVersions.Version) to $($CurrentModule.Version). Release date: $($CurrentModule.PublishedDate)"
+        Update-Module -Name $ModuleName -Force
+    }
+}
+
+function Install-WindowsUpdates {
+    Import-Module PSWindowsUpdate -Force
+
+    $MicrosoftUpdateServiceId = "7971f918-a847-4430-9279-4a52d1efe18d"
+    
+    Write-Host "Checking Microsoft Update Service Registration..."
+    if ((Get-WUServiceManager -ServiceID $MicrosoftUpdateServiceId).ServiceID -ne $MicrosoftUpdateServiceId) {
+        Add-WUServiceManager -ServiceID $MicrosoftUpdateServiceId -Confirm:$false
+    }
+
+    if ((Get-WUServiceManager -ServiceID $MicrosoftUpdateServiceId).ServiceID -eq $MicrosoftUpdateServiceId) {
+        Write-Host "Microsoft Update Service is registered. Installing updates..."
+        Install-WindowsUpdate -AcceptAll -ForceInstall -IgnoreReboot -Verbose
+        Write-Host "Windows Updates completed."
+    }
+    else {
+        Write-Error "ERROR: Failed to register Microsoft Update Service. Try running Windows Update repair tool."
+    }
+}
+
+# Main execution
+try {
+    Write-Host "Starting PowerShell module updates and Windows Update process..." -ForegroundColor Green
+
+    foreach ($Module in $Modules) {
+        Update-PSModule -ModuleName $Module
+    }
+
+    Install-WindowsUpdates
+
+    Write-Host "PowerShell module updates and Windows Update process completed successfully." -ForegroundColor Green
+}
+catch {
+    Write-Host "An error occurred during the update process: $_" -ForegroundColor Red
+}
+finally {
+    Read-Host -Prompt "Press Enter to exit"
+}

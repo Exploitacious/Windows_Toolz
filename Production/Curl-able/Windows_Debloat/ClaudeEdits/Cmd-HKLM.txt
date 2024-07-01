@@ -1,0 +1,108 @@
+@echo off
+setlocal enabledelayedexpansion
+
+REM =====================================================
+REM Windows 10/11 System-wide Customization Script
+REM =====================================================
+REM This script modifies various Windows system-wide settings to:
+REM 1. Customize desktop and taskbar
+REM 2. Adjust privacy settings
+REM 3. Modify Explorer and context menu behavior
+REM 4. Customize Windows 11 specific features (if applicable)
+REM
+REM Note: This script modifies system-wide registry settings. Use with caution.
+REM =====================================================
+
+REM Check Windows version
+for /f "tokens=4-5 delims=. " %%i in ('ver') do set VERSION=%%i.%%j
+if "%VERSION%" == "10.0" (
+    for /f "tokens=2 delims==" %%a in ('wmic os get BuildNumber /value ^| find "="') do set BUILD=%%a
+)
+
+REM Function to add or modify registry keys
+:AddOrUpdateReg
+reg add %1 /v %2 /t %3 /d %4 /f >nul 2>&1
+goto :eof
+
+REM =====================================================
+REM 1. Customize desktop and taskbar (Windows 10 and 11)
+REM =====================================================
+
+REM Disable Microsoft Edge shortcut creation on desktop for new user profiles
+call :AddOrUpdateReg "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer" "DisableEdgeDesktopShortcutCreation" REG_DWORD 1
+del "%userprofile%\Desktop\Microsoft Edge.lnk" 2>nul
+
+REM Hide Meet Now icon in the taskbar
+call :AddOrUpdateReg "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" "HideSCAMeetNow" REG_DWORD 1
+
+REM =====================================================
+REM 2. Adjust privacy settings (Windows 10 and 11)
+REM =====================================================
+
+REM Disable automatic restart sign-on
+call :AddOrUpdateReg "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" "DisableAutomaticRestartSignOn" REG_DWORD 1
+
+REM Disable advertising ID
+call :AddOrUpdateReg "HKLM\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo" "DisabledByGroupPolicy" REG_DWORD 1
+
+REM Set diagnostic data to Basic
+call :AddOrUpdateReg "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" "AllowTelemetry" REG_DWORD 1
+
+REM Disable diagnostic data viewer
+call :AddOrUpdateReg "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" "DisableDiagnosticDataViewer" REG_DWORD 1
+
+REM Disable feedback notifications
+call :AddOrUpdateReg "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" "DoNotShowFeedbackNotifications" REG_DWORD 1
+
+REM Set troubleshooting behavior
+call :AddOrUpdateReg "HKLM\SOFTWARE\Microsoft\WindowsMitigation" "UserPreference" REG_DWORD 2
+
+REM Disable activity history collection
+call :AddOrUpdateReg "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" "PublishUserActivities" REG_DWORD 0
+
+REM =====================================================
+REM 3. Modify Explorer and context menu behavior (Windows 10 and 11)
+REM =====================================================
+
+REM Remove 3D Objects folder from This PC
+reg delete "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\MyComputer\NameSpace\{0DB7E03F-FC29-4DC6-9020-FF41B59E513A}" /f >nul 2>&1
+reg delete "HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Explorer\MyComputer\NameSpace\{0DB7E03F-FC29-4DC6-9020-FF41B59E513A}" /f >nul 2>&1
+
+REM Add "Open elevated PowerShell window here" to context menu
+call :AddOrUpdateReg "HKCR\Directory\Background\shell\PowerShellAsAdmin" "" REG_SZ "Open PowerShell window here as administrator"
+call :AddOrUpdateReg "HKCR\Directory\Background\shell\PowerShellAsAdmin" "HasLUAShield" REG_SZ ""
+call :AddOrUpdateReg "HKCR\Directory\Background\shell\PowerShellAsAdmin" "Icon" REG_SZ "powershell.exe"
+call :AddOrUpdateReg "HKCR\Directory\Background\shell\PowerShellAsAdmin\command" "" REG_SZ "PowerShell -windowstyle hidden -Command \"Start-Process cmd -ArgumentList '/s,/k,pushd,%%%V ^&^& start PowerShell ^&^& exit' -Verb RunAs\""
+
+REM Add "Open elevated command window here" to context menu
+call :AddOrUpdateReg "HKCR\Directory\shell\OpenCmdHereAsAdmin" "" REG_SZ "Open command window here as administrator"
+call :AddOrUpdateReg "HKCR\Directory\shell\OpenCmdHereAsAdmin" "Icon" REG_SZ "imageres.dll,-5324"
+call :AddOrUpdateReg "HKCR\Directory\shell\OpenCmdHereAsAdmin\command" "" REG_SZ "PowerShell -windowstyle hidden -Command \"Start-Process cmd -ArgumentList '/s,/k,pushd,%%%V' -Verb RunAs\""
+
+REM =====================================================
+REM 4. Customize Windows 11 specific features
+REM =====================================================
+
+REM Check if the system is Windows 11 (Build 22000 or higher)
+if %BUILD% GEQ 22000 (
+    echo Applying Windows 11 specific customizations...
+
+    REM Reset pinned items on taskbar
+    del /f /s /q /a "%AppData%\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\*" >nul 2>&1
+    reg delete HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband /f >nul 2>&1
+
+    REM Disable Widgets feature
+    call :AddOrUpdateReg "HKLM\SOFTWARE\Microsoft\PolicyManager\default\NewsAndInterests\AllowNewsAndInterests" "value" REG_DWORD 0
+    call :AddOrUpdateReg "HKLM\SOFTWARE\Policies\Microsoft\Dsh" "AllowNewsAndInterests" REG_DWORD 0
+
+    REM Disable "Show more options" context menu
+    call :AddOrUpdateReg "HKLM\SOFTWARE\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}" "" REG_SZ "File Explorer Context Menu"
+    reg delete "HKLM\SOFTWARE\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InProcServer32" /f >nul 2>&1
+    call :AddOrUpdateReg "HKLM\SOFTWARE\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InProcServer32" "" REG_SZ ""
+
+    echo Windows 11 specific customizations complete.
+) else (
+    echo This system is not running Windows 11. Skipping Windows 11 specific customizations.
+)
+
+echo Windows system-wide customization complete. Please restart your computer for all changes to take effect.
