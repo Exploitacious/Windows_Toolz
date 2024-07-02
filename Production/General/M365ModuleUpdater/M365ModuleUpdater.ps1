@@ -42,7 +42,7 @@ if ($Answer -eq 'Y' -or $Answer -eq 'yes') {
         Get-InstalledModule -Name "AzureAD" -AllVersions | Uninstall-Module -Force
     }
     catch {
-        Write-Host "AzureAD (non Preview) was not detected."
+        Write-Host "AzureAD (non Preview) was not detected. Good!"
     }
 
     $Modules = @(
@@ -162,12 +162,11 @@ if ($Answer -eq 'Y' -or $Answer -eq 'yes') {
 
     $connectionModules = @(
         @{Name = "Exchange Online"; Cmd = { Connect-ExchangeOnline -UserPrincipalName $Cred.Username } },
-        @{Name = "Microsoft Online"; Cmd = { Connect-MsolService -Credential $Cred -AzureEnvironment AzureCloud } },
+        @{Name = "Microsoft Online"; Cmd = { Connect-MsolService } },
         @{Name = "Azure AD Preview"; Cmd = { Connect-AzureAD } },
-        @{Name = "MG Graph"; Cmd = { Connect-MgGraph -Scopes "User.Read.All", "Group.ReadWrite.All", "Policy.Read.All", "Policy.ReadWrite.ConditionalAccess", "DeviceManagementServiceConfiguration.ReadWrite.All", "DeviceManagementServiceConfig.ReadWrite.All" } },
         @{Name = "Azure Information Protection"; Cmd = { Connect-AipService } },
-        @{Name = "Information Protection Service"; Cmd = { Connect-IPPSSession } },
-        @{Name = "MS Graph (Old School)"; Cmd = { Connect-MSGraph } }
+        @{Name = "Information Protection Service"; Cmd = { Connect-IPPSSession } }
+        #@{Name = "MG Graph"; Cmd = { Connect-MgGraph -Scopes "User.Read.All", "Group.ReadWrite.All", "Policy.Read.All", "Policy.ReadWrite.ConditionalAccess", "DeviceManagementServiceConfiguration.ReadWrite.All", "DeviceManagementServiceConfig.ReadWrite.All" } },
     )
 
     foreach ($module in $connectionModules) {
@@ -190,15 +189,16 @@ if ($Answer -eq 'Y' -or $Answer -eq 'yes') {
     }
 
     Write-Host
-    Write-Host "Verify your module connections. You should see all green above with no errors."
+    Write-Host "Verify your module connections. You should see no errors above and all connected below."
 }
 
 # Display summary
-Write-Host "`nModule Installation/Update Summary:"
+Write-Host
+Write-Host "Module Installation/Update Summary:"
 $modulesSummary | Format-Table -AutoSize
 
 if ($connectionSummary.Count -gt 0) {
-    Write-Host "`nModule Connection Summary:"
+    Write-Host "Module Connection Summary:"
     $connectionSummary | Format-Table -AutoSize
 }
 
