@@ -121,8 +121,7 @@ alias desktop='kex --win -s'
 alias gcu="git config user.name \"Alex Ivantsov\" && git config user.email \"alex@ivantsov.tech\""
 alias myip='curl http://ipecho.net/plain; echo'
 alias distro='cat /etc/*-release'
-alias rustscan='sudo docker run -it --rm --name rustscan rustscan/rustscan:2.1.1'
-
+alias rustscan='sudo docker run --rm --name rustscan --privileged -v /dev:/dev -v /home/master/.rustscan:/home/rustscan:ro rustscan/rustscan:2.1.1'
 # Created by `pipx` on 2024-06-01 17:58:38
 export PATH="$PATH:/home/master/.local/bin"
 

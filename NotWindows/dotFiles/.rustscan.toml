@@ -1,0 +1,32 @@
+# Scan settings
+addresses = []
+ports = [1,65535]
+scan_order = "random"
+scan_type = "SYN"
+
+# Performance settings
+batch_size = 10000
+timeout = 1500
+tries = 1
+
+# Output settings
+accessible = false
+greppable = false
+json = false
+no-config = false
+
+# Nmap settings
+command = "-sV -sC -O"
+script = []
+
+# Rate limiting
+rate = 10000
+
+# DNS settings
+dns-servers = []
+
+# Debugging
+debug = false
+
+# Custom scripts
+scripts = []
