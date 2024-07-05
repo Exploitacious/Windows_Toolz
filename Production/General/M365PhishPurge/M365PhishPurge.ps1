@@ -1,12 +1,67 @@
-
-####
-# M365 Pish Purge
-####
+## M365 Phish Purge
+# Automated Email search and removal with Power + M365 Compliance Center 
+Clear-Host
+Write-Host "         .___  ___.  ____      __    _____     .______    __    __   __       _______. __    __                 "
+Write-Host "         |   \/   | |___ \    / /   | ____|    |   _  \  |  |  |  | |  |     /       ||  |  |  |                "
+Write-Host "         |  \  /  |   __) |  / /_   | |__      |  |_)  | |  |__|  | |  |    |   (----'|  |__|  |                "
+Write-Host "         |  |\/|  |  |__ <  | '_ \  |___ \     |   ___/  |   __   | |  |     \   \    |   __   |                "
+Write-Host "         |  |  |  |  ___) | | (_) |  ___) |    |  |      |  |  |  | |  | .----)   |   |  |  |  |                "
+Write-Host "         |__|  |__| |____/   \___/  |____/     | _|      |__|  |__| |__| |_______/    |__|  |__|                "
+Write-Host "                                                                                                                "
+Write-Host "     ___      .__   __. .__   __.  __   __    __   __   __          ___   .___________.  ______   .______       "
+Write-Host "    /   \     |  \ |  | |  \ |  | |  | |  |  |  | |  | |  |        /   \  |           | /  __  \  |   _  \      "
+Write-Host "   /  ^  \    |   \|  | |   \|  | |  | |  |__|  | |  | |  |       /  ^  \ '---|  |----'|  |  |  | |  |_)  |     "
+Write-Host "  /  /_\  \   |  . '  | |  . '  | |  | |   __   | |  | |  |      /  /_\  \    |  |     |  |  |  | |      /      "
+Write-Host " /  _____  \  |  |\   | |  |\   | |  | |  |  |  | |  | |  '----./  _____  \   |  |     |  '--'  | |  |\  \----. "
+Write-Host "/__/     \__\ |__| \__| |__| \__| |__| |__|  |__| |__| |_______/__/     \__\  |__|      \______/  | _| '._____| "
+Write-Host "                                                                                                                "
+Write-Host
+Write-Host "Created by Alex Ivantsov @Exploitacious"
+Write-Host
+Write-Host
+Write-Host
+Write-Host "You may need to use an account with CA bypassed if your device is not registered in Azure/Intune"
+Write-Host
+Write-Host
+Write-Host -ForegroundColor Green "       -= Please Enter the Global Admin Credentials for the M365 Tenant =-  "
 
 # Check PowerShell version
 if ($PSVersionTable.PSVersion.Major -lt 5) {
     Write-Host "This script requires PowerShell 5.1 or later. Your version is $($PSVersionTable.PSVersion). Please upgrade PowerShell and try again." -ForegroundColor Red
     exit
+}
+
+# Specify the log file path
+$logFile = Join-Path $PSScriptRoot "PurgeOp_$(Get-Date -Format 'yyyyMMdd_HH-mm').log"
+
+# Function to write log messages
+function Write-Log {
+    param (
+        [string]$Message
+    )
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logMessage = "[$timestamp] $Message"
+    Add-Content -Path $logFile -Value $logMessage
+    Write-Host $logMessage
+}
+
+# Function to display the log file contents
+function Display-LogFile {
+    param (
+        [string]$logFile
+    )
+
+    if (Test-Path $logFile) {
+        Write-Host
+        Write-Host "Search and Purge Operations Completed"
+        Write-Host "=================="
+        Get-Content -Path $logFile | ForEach-Object { Write-Host $_ }
+        Write-Host "=================="
+        Write-Host "Log file path: $logFile"
+    }
+    else {
+        Write-Host "Log file not found: $logFile"
+    }
 }
 
 # Load required assemblies for GUI
@@ -98,7 +153,7 @@ function Show-InputBoxDialog([string]$message, [string]$title, [string]$defaultT
         }
     }
     else {
-        return $null
+        return [System.Windows.Forms.DialogResult]::Cancel
     }
 }
 
@@ -107,10 +162,10 @@ function Add-SenderToBlocklist($senderEmail) {
     try {
         # Create a new blocked sender entry
         New-TenantAllowBlockListItems -ListType Sender -Block -Entries $senderEmail -NoExpiration
-        Write-Host "Sender $senderEmail has been added to the blocklist."
+        Write-Log "Sender $senderEmail has been added to the blocklist."
     }
     catch {
-        Write-Host "Failed to add sender to blocklist: $_"
+        Write-Log "Failed to add sender to blocklist: $_"
     }
 }
 
@@ -118,19 +173,19 @@ function Add-SenderToBlocklist($senderEmail) {
 function Display-SearchResults($searchName) {
     $searchResults = Get-ComplianceSearch -Identity $searchName
     Write-Host "`nDetailed Search Results:"
-    Write-Host "Total Items Found: $($searchResults.Items)"
+    Write-Log "Total Items Found: $($searchResults.Items)"
     Write-Host "Locations Searched: $($searchResults.NumberOfMailboxesProcessed)"
     
     $contentMatchQuery = $searchResults.ContentMatchQuery
-    Write-Host "Search Query: $contentMatchQuery"
+    Write-Log "Search Query: $contentMatchQuery"
 
     # Get more details about the found items
     $statistics = $searchResults | Select-Object -ExpandProperty SearchStatistics | ConvertFrom-Json
     if ($statistics.ExchangeBinding.SuccessResults) {
         $exchangeStats = $statistics.ExchangeBinding.SuccessResults | Select-Object -First 1
-        Write-Host "`nTop Locations with Results:"
+        Write-Log "`nTop Locations with Results:"
         foreach ($location in $exchangeStats.LocationsWithResults) {
-            Write-Host "- $($location.Name): $($location.ItemsInLocation) item(s)"
+            Write-Log "- $($location.Name): $($location.ItemsInLocation) item(s)"
         }
     }
 }
@@ -141,14 +196,14 @@ function Confirm-EmailDeletion($searchName, $purgeType) {
     $purgedItemCount = $purgeAction.Results -replace '.*Items removed: ([0-9]+).*', '$1'
     
     Write-Host "`nPurge Confirmation:"
-    Write-Host "Purge Type: $purgeType"
-    Write-Host "Items Purged: $purgedItemCount"
+    Write-Log "Purge Type: $purgeType"
+    Write-Log "Items Purged: $purgedItemCount"
     
     if ($purgeType -eq "HardDelete") {
-        Write-Host "Items have been permanently deleted and are not recoverable."
+        Write-Log "Items have been permanently deleted and are not recoverable."
     }
     else {
-        Write-Host "Items have been moved to the Recoverable Items folder and can be restored by users or administrators."
+        Write-Log "Items have been moved to the Recoverable Items folder and can be restored by users or administrators."
     }
 }
 
@@ -232,111 +287,160 @@ function Update-Module {
     }
 }
 
+# Main logic for Search and Purge
+function Start-PhishPurgeProcess {
+    try {
+        # Show input dialog and get search criteria
+        $searchCriteria = Show-InputBoxDialog -message "Enter search criteria for malicious emails:" -title "Malicious Email Search"
 
-############################################
-# Main script execution
-############################################
+        if ($searchCriteria -eq [System.Windows.Forms.DialogResult]::Cancel) {
+            Write-Host -ForegroundColor Red "Operation cancelled by user."
+            exit
+        }
 
-try {
-    y
-    # Disconnect any active sessions
-    Get-PSSession | Remove-PSSession
-    Disconnect-ExchangeOnline -Confirm:$false -ErrorAction SilentlyContinue
+        # The rest of your logic
+        # Construct content match query (simplified)
+        $contentMatchQuery = "subject:`"$($searchCriteria.Subject)`""
+        if ($searchCriteria.From -ne "Enter sender email (optional)") {
+            $contentMatchQuery += " AND from:$($searchCriteria.From)"
+        }
 
-    $Credential = Get-Credential
+        # Create a unique name for the compliance search
+        $searchName = "MaliciousEmail-" + (Get-Date).ToString("yyyyMMddHHmmss")
 
-    # Update Modules   
-    Update-Module "ExchangeOnlineManagement"
-    Update-Module "AIPService"
+        # Create and start the compliance search
+        Write-Log "Creating and starting compliance search..."
+        Write-Host
+        New-ComplianceSearch -Name $searchName -ExchangeLocation All -ContentMatchQuery $contentMatchQuery
+        Start-ComplianceSearch -Identity $searchName
 
-    # Connect to Security & Compliance Center and Exchange Online
-    Connect-IPPSSession -UserPrincipalName $Credential.UserName
-    Connect-ExchangeOnline -UserPrincipalName $Credential.UserName
-
-    # Show input dialog and get search criteria
-    $searchCriteria = Show-InputBoxDialog -message "Enter search criteria for malicious emails:" -title "Malicious Email Search"
-
-    if ($searchCriteria -eq $null) {
-        Write-Host "Operation cancelled by user."
-        exit
-    }
-
-    # Construct content match query (simplified)
-    $contentMatchQuery = "subject:`"$($searchCriteria.Subject)`""
-    if ($searchCriteria.From -ne "Enter sender email (optional)") {
-        $contentMatchQuery += " AND from:$($searchCriteria.From)"
-    }
-
-    # Create a unique name for the compliance search
-    $searchName = "MaliciousEmail-" + (Get-Date).ToString("yyyyMMddHHmmss")
-
-    # Create and start the compliance search
-    Write-Host "Creating and starting compliance search..."
-    New-ComplianceSearch -Name $searchName -ExchangeLocation All -ContentMatchQuery $contentMatchQuery
-    Start-ComplianceSearch -Identity $searchName
-
-    # Wait for the search to complete
-    do {
-        Start-Sleep -Seconds 5
-        $searchStatus = (Get-ComplianceSearch -Identity $searchName).Status
-        Write-Host "Search status: $searchStatus"
-    } while ($searchStatus -ne "Completed")
-
-    # Display detailed search results
-    Display-SearchResults $searchName
-
-    # Prompt user for confirmation before purging
-    $confirmation = Read-Host "Do you want to proceed with purging these items? (Y/N)"
-    if ($confirmation -eq 'Y') {
-        # Create and start the purge action
-        Write-Host "Starting purge action..."
-        New-ComplianceSearchAction -SearchName $searchName -Purge -PurgeType $searchCriteria.PurgeType
-
-        # Wait for the purge to complete
+        # Wait for the search to complete
+        Write-Host "Checking status every 5 seconds..."
+        Write-Host
         do {
             Start-Sleep -Seconds 5
-            $purgeStatus = (Get-ComplianceSearchAction -Identity "${searchName}_Purge").Status
-            Write-Host "Purge status: $purgeStatus"
-        } while ($purgeStatus -ne "Completed")
+            $searchStatus = (Get-ComplianceSearch -Identity $searchName).Status
+            Write-Host "Search status: $searchStatus"
+        } while ($searchStatus -ne "Completed")
 
-        # Confirm email deletion
-        Confirm-EmailDeletion $searchName $searchCriteria.PurgeType
-    }
-    else {
-        Write-Host "Purge operation cancelled by user."
-    }
+        # Display detailed search results
+        Display-SearchResults $searchName
 
-    # Add sender to blocklist if option was selected
-    $blockList = @()
-    if ($searchCriteria.BlockSender -and $searchCriteria.From -ne "Enter sender email (optional)") {
-        $blockList += $searchCriteria.From
-    }
+        # Prompt user for confirmation before purging
+        Write-Host
+        $confirmation = Read-Host "Do you want to proceed with purging these items? (Y/N)"
+        if ($confirmation -eq 'Y') {
+            # Create and start the purge action
+            Write-Host
+            Write-Host "Starting purge action..."
+            New-ComplianceSearchAction -SearchName $searchName -Purge -PurgeType $searchCriteria.PurgeType
 
-    # Allow user to add more email addresses to the block list
-    do {
-        $additionalEmail = Read-Host "Enter any additional email addresseses to block. One at a time. Press Enter after every address. (or press Enter to finish)"
-        if ($additionalEmail -ne "") {
-            $blockList += $additionalEmail
-        }
-    } while ($additionalEmail -ne "")
+            # Wait for the purge to complete
+            Write-Host "Purge Started. Checking status every 5 seconds..."
+            Write-Host
+            do {
+                Start-Sleep -Seconds 5
+                $purgeStatus = (Get-ComplianceSearchAction -Identity "${searchName}_Purge").Status
+                Write-Host "Purge status: $purgeStatus"
+            } while ($purgeStatus -ne "Completed")
 
-    if ($blockList.Count -gt 0) {
-        $blockConfirmation = Read-Host "Do you want to add the following email(s) to the blocklist? `n$($blockList -join ", ")`n(Y/N)"
-        if ($blockConfirmation -eq 'Y') {
-            foreach ($email in $blockList) {
-                Add-SenderToBlocklist $email
-            }
+            # Confirm email deletion
+            Confirm-EmailDeletion $searchName $searchCriteria.PurgeType
         }
         else {
-            Write-Host "Sender blocking cancelled by user."
+            Write-Host "Purge operation cancelled by user."
+        }
+
+        # Add sender to blocklist if option was selected
+        $blockList = @()
+        if ($searchCriteria.BlockSender -and $searchCriteria.From -ne "Enter sender email (optional)") {
+            $blockList += $searchCriteria.From
+        }
+
+        # Allow user to add more email addresses to the block list
+        do {
+            Write-Host
+            $additionalEmail = Read-Host "Enter any additional email addresseses to block. One at a time, pressing Enter after every address. (or press Enter to finish)"
+            if ($additionalEmail -ne "") {
+                $blockList += $additionalEmail
+            }
+        } while ($additionalEmail -ne "")
+
+        if ($blockList.Count -gt 0) {
+            Write-Host
+            $blockConfirmation = Read-Host "Do you want to add the following email(s) to the blocklist? `n$($blockList -join ", ")`n(Y/N)"
+            if ($blockConfirmation -eq 'Y') {
+                foreach ($email in $blockList) {
+                    Write-Log "Adding Email $email to Global Blocklist"
+                    Add-SenderToBlocklist $email
+                }
+            }
+            else {
+                Write-Host "Sender blocking cancelled by user."
+            }
         }
     }
+    catch {
+        Write-Host "An error occurred: $_"
+    }
+
+    Write-Host
+    Write-Host "Search and Purge operation completed"
+    Write-Host
+}
+
+############################################
+# Main Script Execution
+############################################
+
+# Disconnect any active sessions
+Get-PSSession | Remove-PSSession
+Disconnect-ExchangeOnline -Confirm:$false -ErrorAction SilentlyContinue
+
+try {
+    $Credential = Get-Credential -ErrorAction Stop
 }
 catch {
-    Write-Host "An error occurred: $_"
+    Write-Host -ForegroundColor Red "Credentials not entered. Exiting..."
+    exit
 }
-finally {
-    # Disconnect the sessions
-    Get-PSSession | Remove-PSSession
-    Disconnect-ExchangeOnline -Confirm:$false
+Write-Host
+
+# Update Modules   
+Update-Module "ExchangeOnlineManagement"
+Update-Module "AIPService"
+
+Write-Host
+Write-Host -ForegroundColor Green "Please satisfy MFA"
+
+# Connect to Security & Compliance Center and Exchange Online
+Connect-IPPSSession -UserPrincipalName $Credential.UserName
+Connect-ExchangeOnline -UserPrincipalName $Credential.UserName
+
+Write-Host
+Write-Host "There should be no errors thus far. If you see any red, please exit the script with Ctrl-C and try again."
+
+$Answer = Read-Host "Ready to continue? Y/N"
+if ($Answer -eq 'Y' -or $Answer -eq 'yes') {
+    Write-Host
+    Write-Host
+
+    # Loop over Search and Purge process as long as the user needs
+    do {
+        Start-PhishPurgeProcess
+
+        $repeat = Read-Host "Do you want to perform another search and purge operation on the same tenant? ( Y / N )"
+    } while ($repeat -eq 'Y')
+
 }
+
+
+
+# Disconnect any active sessions
+Get-PSSession | Remove-PSSession
+Disconnect-ExchangeOnline -Confirm:$false -ErrorAction SilentlyContinue
+Write-Host
+Display-LogFile $logFile
+Write-Host
+Write-Host "Script execution completed. Use the above output to paste into the ticket before closing it."
+Read-Host "All sessions have been disconnected. Press Enter to continue"

@@ -1,22 +1,24 @@
-
-
-write-host ".___  ___.  ____      __    _____     .___  ___.   ______    _______   __    __   __       _______     _______."
-write-host "|   \/   | |___ \    / /   | ____|    |   \/   |  /  __  \  |       \ |  |  |  | |  |     |   ____|   /       |"
-write-host "|  \  /  |   __) |  / /_   | |__      |  \  /  | |  |  |  | |  .--.  ||  |  |  | |  |     |  |__     |   (----'"
-write-host "|  |\/|  |  |__ <  | '_ \  |___ \     |  |\/|  | |  |  |  | |  |  |  ||  |  |  | |  |     |   __|     \   \    "
-write-host "|  |  |  |  ___) | | (_) |  ___) |    |  |  |  | |  `--'  | |  '--'  ||  `--'  | |  `----.|  |____.----)   |   "
-write-host "|__|  |__| |____/   \___/  |____/     |__|  |__|  \______/  |_______/  \______/  |_______||_______|_______/    "
-write-host "                                                                                                               "
-write-host "                __    __  .______    _______       ___   .___________. _______ .______                         "
-write-host "               |  |  |  | |   _  \  |       \     /   \  |           ||   ____||   _  \                        "
-write-host "               |  |  |  | |  |_)  | |  .--.  |   /  ^  \ `---|  |----`|  |__   |  |_)  |                       "
-write-host "               |  |  |  | |   ___/  |  |  |  |  /  /_\  \    |  |     |   __|  |      /                        "
-write-host "               |  `--'  | |  |      |  '--'  | /  _____  \   |  |     |  |____ |  |\  \----.                   "
-write-host "                \______/  | _|      |_______/ /__/     \__\  |__|     |_______|| _| `._____|                   "
-write-host "                                                                                                               "
-write-host " "
+## Module Standalone Updater.
+# Update all existing Modules, plus install the latest versions of the M365 Management PowerShell Modules.
+Clear-Host
+Write-Host 
+Write-Host " .______     _______.   .___  ___.   ______    _______   __    __   __       _______  "
+Write-Host " |   _  \   /       |   |   \/   |  /  __  \  |       \ |  |  |  | |  |     |   ____| "
+Write-Host " |  |_)  | |   (----'   |  \  /  | |  |  |  | |  .--.  ||  |  |  | |  |     |  |__    "
+Write-Host " |   ___/   \   \       |  |\/|  | |  |  |  | |  |  |  ||  |  |  | |  |     |   __|   "
+Write-Host " |  |   .----)   |      |  |  |  | |  '--'  | |  '--'  ||  '--'  | |  '----.|  |____  "
+Write-Host " | _|   |_______/       |__|  |__|  \______/  |_______/  \______/  |_______||_______| "
+Write-Host "                                                                                      "
+Write-Host "     __    __  .______    _______       ___   .___________. _______ .______           "
+Write-Host "    |  |  |  | |   _  \  |       \     /   \  |           ||   ____||   _  \          "
+Write-Host "    |  |  |  | |  |_)  | |  .--.  |   /  ^  \ '---|  |----'|  |__   |  |_)  |         "
+Write-Host "    |  |  |  | |   ___/  |  |  |  |  /  /_\  \    |  |     |   __|  |      /          "
+Write-Host "    |  '--'  | |  |      |  '--'  | /  _____  \   |  |     |  |____ |  |\  \----.     "
+Write-Host "     \______/  | _|      |_______/ /__/     \__\  |__|     |_______|| _| '._____|     "
+Write-Host "                                                                                      "
+write-host
 write-host " Created by Alex Ivantsov @Exploitacious "
-write-host " "
+write-host
 Write-Host
 
 # Check PowerShell version
@@ -30,18 +32,34 @@ if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 
 $modulesSummary = @()
 
-$Answer = Read-Host "Would you like this script to run a pre-requisite check to make sure you have all the modules correctly installed? * RECOMMENDED * (Will automatically install and update all required modules) Y or N"
+$Answer = Read-Host "Install, Update and Clean Up all PoswerShell modules? Y/N"
 if ($Answer -eq 'Y' -or $Answer -eq 'yes') {
 
     Write-Host
     Write-Host "Checking for Installed Modules..."
 
     $Modules = @(
-        "ExchangeOnlineManagement"; 
-        "AIPService"
+        "ExchangeOnlineManagement",
+        "MSOnline",
+        "AzureADPreview",
+        "MSGRAPH",
+        "Microsoft.Graph",
+        "AIPService",
+        "MicrosoftTeams",
+        "Microsoft.Online.SharePoint.PowerShell"
     )
+    
+    $installedModules = Get-InstalledModule * | Select-Object -ExpandProperty Name
+    
+    $Modules += $installedModules
+
+    Write-Host
+    Write-Host "Updating All and Installing M365 Modules..."
+    Write-Host
+    Write-Host
 
     Foreach ($Module In $Modules) {
+        Write-Host
         $currentVersion = $null
         if ($null -ne (Get-InstalledModule -Name $Module -ErrorAction SilentlyContinue)) {
             $currentVersion = (Get-InstalledModule -Name $module -AllVersions).Version
@@ -119,11 +137,10 @@ if ($Answer -eq 'Y' -or $Answer -eq 'yes') {
     }
 
     Write-Host
-    Write-Host
     Write-Host "Check the modules listed in the verification above. If you see any errors, please check the module(s) or restart the script to try and auto-fix."
-    Write-Host "Most common error is that you have 'AzureAD' instead of 'AzureADPreview' installed. Please remove AzureAD and try again."
-    Write-Host "You can re-run this part of the script as many times as necessary until all modules are up to date and correctly installed."
+    Write-Host
+    Write-Host "Re-run this script as many times as necessary until all modules are correctly installed and up to date."
     Write-Host
 } 
 
-Read-Host "`nScript execution completed. Please review the summaries above for any issues. Press Enter to continue"
+Read-Host "Script execution completed. Please review the summaries above for any issues. Press Enter to continue"
