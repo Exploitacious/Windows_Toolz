@@ -31,6 +31,12 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
     exit
 }
 
+# Verify/Elevate Admin Session.
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { 
+    Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    exit 
+}
+
 # Specify the log file path
 $logFile = Join-Path $PSScriptRoot "PurgeOp_$(Get-Date -Format 'yyyyMMdd_HH-mm').log"
 
@@ -121,7 +127,7 @@ function Show-InputBoxDialog([string]$message, [string]$title, [string]$defaultT
     $instructionsLabel = New-Object System.Windows.Forms.Label
     $instructionsLabel.Location = New-Object System.Drawing.Point(10, 250)
     $instructionsLabel.Size = New-Object System.Drawing.Size(380, 80)
-    $instructionsLabel.Text = "Instructions:`r`n- Subject is required`r`n- Sender and recipient are optional`r`n- Select the date the email was sent`r`n- Choose purge type (Soft/Hard Delete)`r`n- Check the box to add sender to blocklist"
+    $instructionsLabel.Text = "Instructions:`r`n- Subject is required`r`n- Sender and recipient are optional`r`n- Select the date the email was received`r`n- Choose purge type (Soft/Hard Delete)`r`n- Check the box to add sender to blocklist"
     $form.Controls.Add($instructionsLabel)
 
     $okButton = New-Object System.Windows.Forms.Button
