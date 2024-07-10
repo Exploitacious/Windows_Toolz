@@ -217,7 +217,7 @@ function Restart-TerminalProcesses {
 #######################
 
 while ($true) {
-    $input = Read-Host "Enter the name of the module to begin removal ; 'RESTORE' to reset PowerShell to stock settings ; or 'q' to quit and reset terminal"
+    $input = Read-Host "Enter the EXACT name of the module to begin removal ; 'RESTORE' to reset PowerShell to stock settings (Experimental) ; or 'q' to quit and reset terminal"
 
     if ($input -eq "q") {
         Write-Host "Exiting script."
