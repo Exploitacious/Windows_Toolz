@@ -1,6 +1,18 @@
 ## M365 Phish Purge
 # Automated Email search and removal with Power + M365 Compliance Center 
-Clear-Host
+
+# Check PowerShell version
+if ($PSVersionTable.PSVersion.Major -lt 5) {
+    Write-Host "This script requires PowerShell 5.1 or later. Your version is $($PSVersionTable.PSVersion). Please upgrade PowerShell and try again." -ForegroundColor Red
+    exit
+}
+
+# Verify/Elevate Admin Session.
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { 
+    Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    exit 
+}
+
 Write-Host "         .___  ___.  ____      __    _____     .______    __    __   __       _______. __    __                 "
 Write-Host "         |   \/   | |___ \    / /   | ____|    |   _  \  |  |  |  | |  |     /       ||  |  |  |                "
 Write-Host "         |  \  /  |   __) |  / /_   | |__      |  |_)  | |  |__|  | |  |    |   (----'|  |__|  |                "
@@ -24,18 +36,7 @@ Write-Host "You may need to use an account with CA bypassed if your device is no
 Write-Host
 Write-Host
 Write-Host -ForegroundColor Green "       -= Please Enter the Global Admin Credentials for the M365 Tenant =-  "
-
-# Check PowerShell version
-if ($PSVersionTable.PSVersion.Major -lt 5) {
-    Write-Host "This script requires PowerShell 5.1 or later. Your version is $($PSVersionTable.PSVersion). Please upgrade PowerShell and try again." -ForegroundColor Red
-    exit
-}
-
-# Verify/Elevate Admin Session.
-if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { 
-    Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
-    exit 
-}
+Write-Host
 
 # Specify the log file path
 $logFile = Join-Path $PSScriptRoot "PurgeOp_$(Get-Date -Format 'yyyyMMdd_HH-mm').log"
@@ -59,7 +60,7 @@ function Display-LogFile {
 
     if (Test-Path $logFile) {
         Write-Host
-        Write-Host "Search and Purge Operations Completed"
+        Write-Host "Search and Purge Operations Completed" -ForegroundColor Green
         Write-Host "=================="
         Get-Content -Path $logFile | ForEach-Object { Write-Host $_ }
         Write-Host "=================="
@@ -389,9 +390,6 @@ function Start-PhishPurgeProcess {
     catch {
         Write-Host "An error occurred: $_"
     }
-
-    Write-Host
-    Write-Host "Search and Purge operation completed"
     Write-Host
 }
 
