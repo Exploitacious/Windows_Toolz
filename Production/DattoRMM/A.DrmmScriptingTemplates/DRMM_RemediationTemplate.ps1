@@ -29,31 +29,13 @@ function write-DRMMDiag ($messages) {
     foreach ($Message in $Messages) { $Message + ' `' }
     Write-Host '<-End Diagnostic->'
 }
-Function GenRANDString ([Int]$CharLength, [Char[]]$CharSets = "ULNS") {
-    $Chars = @()
-    $TokenSet = @()
-    If (!$TokenSets) {
-        $Global:TokenSets = @{
-            U = [Char[]]'ABCDEFGHIJKLMNOPQRSTUVWXYZ'                                # Upper case
-            L = [Char[]]'abcdefghijklmnopqrstuvwxyz'                                # Lower case
-            N = [Char[]]'0123456789'                                                # Numerals
-            S = [Char[]]'!"#%&()*+,-./:;<=>?@[\]^_{}~'                             # Symbols
-        }
-    }
-    $CharSets | ForEach-Object {
-        $Tokens = $TokenSets."$_" | ForEach-Object { If ($Exclude -cNotContains $_) { $_ } }
-        If ($Tokens) {
-            $TokensSet += $Tokens
-            If ($_ -cle [Char]"Z") { $Chars += $Tokens | Get-Random }             #Character sets defined in upper case are mandatory
-        }
-    }
-    While ($Chars.Count -lt $CharLength) { $Chars += $TokensSet | Get-Random }
-    ($Chars | Sort-Object { Get-Random }) -Join ""                                #Mix the (mandatory) characters and output string
-};
+function genRandString ([int]$length, [string]$chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') {
+    return -join ((1..$length) | ForEach-Object { Get-Random -InputObject $chars.ToCharArray() })
+}
 # Extra Info and Variables (Leave at default)
 $Global:DiagMsg = @() # Running Diagnostic log (diaglog). Use " $Global:DiagMsg += " to append messages to this log for verboseness in the script.
 $Global:varUDFString = @() # String which will be written to UDF, if UDF Number is defined by $usrUDF in Datto. Use " $Global:varUDFString += " to fill this string.
-$ScriptUID = GenRANDString 15 UN # Generate random UID for script
+$ScriptUID = GenRANDString 20 # Generate random UID for script
 $Date = get-date -Format "MM/dd/yyy hh:mm tt"
 $Global:DiagMsg += "Script Type: " + $ScriptType
 $Global:DiagMsg += "Script Name: " + $ScriptName
