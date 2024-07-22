@@ -1,9 +1,9 @@
 # 
-## Template for Remediation Components for Datto RMM with PowerShell
+## Remediation for Disk Errors for Datto RMM with PowerShell
 # Created by Alex Ivantsov @Exploitacious
 
 # Script Name and Type
-$ScriptName = "Install System Update" # Quick and easy name of Script to help identify
+$ScriptName = "Disk Health Remediation" # Quick and easy name of Script to help identify
 $ScriptType = "Remediation" # Monitoring // Remediation
 
 ## Verify/Elevate to Admin Session. Comment out if not needed the single line below.
@@ -63,10 +63,9 @@ $Global:DiagMsg += "Executed On: " + $Date
 ##################################
 ######## Start of Script #########
 
-
-
-
-Write-Host "Starting Disk Health Remediation process..."
+# Initialize summary
+$summary = @()
+$summary += "Disk Health Remediation Process Initiated"
 
 # Function to check if a file is potentially corrupt
 function Test-FileCorruption {
@@ -76,10 +75,10 @@ function Test-FileCorruption {
     $fileInfo = Get-Item $FilePath
     $versionInfo = $fileInfo.VersionInfo
     
-    # Check if file has no version info or if it's a system file with unexpected attributes
-    if ($null -eq $versionInfo.FileVersion -or 
+    if ($null -eq $versionInfo.FileVersion -and 
         ($fileInfo.Attributes -band [System.IO.FileAttributes]::System) -and 
-        ($null -eq $versionInfo.CompanyName -or $versionInfo.CompanyName -ne "Microsoft Corporation")) {
+        ($null -eq $versionInfo.CompanyName -or $versionInfo.CompanyName -ne "Microsoft Corporation") -and
+        ($fileInfo.Length -eq 0 -or $fileInfo.LastWriteTime -lt (Get-Date).AddYears(-5))) {
         return $true
     }
     return $false
@@ -99,31 +98,21 @@ function Test-DiskHealth {
     if ($freeSpacePercent -lt 10) {
         Write-Host "WARNING: Low disk space on $DriveLetter. Only $([math]::Round($freeSpacePercent,2))% free."
         $Global:DiagMsg += "WARNING: Low disk space on $DriveLetter. Only $([math]::Round($freeSpacePercent,2))% free."
+        $summary += "Low disk space detected on $DriveLetter"
     }
 
-    # Check for file system errors using fsutil
-    Write-Host "Checking file system on $DriveLetter..."
+    # Check for file system errors
     $fsutilOutput = fsutil repair query $DriveLetter
     if ($fsutilOutput -match "There are problems in the file system") {
         Write-Host "WARNING: File system errors detected on $DriveLetter. Consider running chkdsk on next reboot."
         $Global:DiagMsg += "WARNING: File system errors detected on $DriveLetter. Consider running chkdsk on next reboot."
-    }
-    else {
-        Write-Host "No file system errors detected on $DriveLetter"
-        $Global:DiagMsg += "No file system errors detected on $DriveLetter"
+        $summary += "File system errors detected on $DriveLetter"
     }
 
-    # Check S.M.A.R.T. status using Get-PhysicalDisk
-    Write-Host "Checking S.M.A.R.T. status for $DriveLetter..."
-    $Global:DiagMsg += "Checking S.M.A.R.T. status for $DriveLetter"
+    # Check S.M.A.R.T. status
     try {
-        # Get the partition associated with the drive letter
         $partition = Get-Partition -DriveLetter $DriveLetter.Trim(':')
-
-        # Get the disk associated with the partition
         $disk = Get-Disk -Number $partition.DiskNumber
-
-        # Get the physical disk associated with the disk
         $physicalDisk = Get-PhysicalDisk -UniqueId $disk.UniqueId
 
         if ($physicalDisk) {
@@ -134,11 +123,8 @@ function Test-DiskHealth {
             if ($healthStatus -ne "Healthy" -or $operationalStatus -ne "OK") {
                 Write-Host "WARNING: Disk $DriveLetter may require attention"
                 $Global:DiagMsg += "WARNING: Disk $DriveLetter may require attention"
+                $summary += "Disk health issues detected on $DriveLetter"
             }
-        }
-        else {
-            Write-Host "Unable to find physical disk for $DriveLetter"
-            $Global:DiagMsg += "Unable to find physical disk for $DriveLetter"
         }
     }
     catch {
@@ -147,13 +133,12 @@ function Test-DiskHealth {
     }
 }
 
-Write-Host "Checking System Event Logs for disk-related events..."
-$Global:DiagMsg += "Checking System Event Logs for disk-related events"
+# Start of main script execution
+$scriptStartTime = Get-Date
+Write-Host "Starting Disk Health Remediation process..."
 
-# Define an array of disk-related event sources
+# Check System Event Logs
 $diskEventSources = @('disk', 'ntfs', 'volsnap', 'storagespace', 'volmgr', 'partmgr', 'iaStor', 'Chkdsk')
-
-# Get disk-related events from the last 24 hours
 $diskEvents = Get-WinEvent -FilterHashtable @{
     LogName   = 'System'
     StartTime = (Get-Date).AddHours(-24)
@@ -162,26 +147,23 @@ $diskEvents = Get-WinEvent -FilterHashtable @{
 }
 
 if ($diskEvents) {
-    Write-Host "Found the following important disk-related events:"
-    $Global:DiagMsg += "Found the following important disk-related events:"
+    Write-Host "Found important disk-related events in the last 24 hours:"
+    $Global:DiagMsg += "Found important disk-related events in the last 24 hours:"
     foreach ($event in $diskEvents) {
         $eventMessage = "Event ID: $($event.Id), Source: $($event.ProviderName), Message: $($event.Message)"
         Write-Host $eventMessage
         $Global:DiagMsg += $eventMessage
     }
+    $summary += "Disk-related events detected"
 }
 else {
     Write-Host "No relevant disk events found in System Event Log in the last 24 hours"
     $Global:DiagMsg += "No relevant disk events found in System Event Log in the last 24 hours"
+    $summary += "No disk-related events detected"
 }
 
-# Get all partitions
-Write-Host "Retrieving partition information..."
+# Check partitions and disk health
 $partitionlist = Get-Partition
-$partitionGroup = $partitionlist | Group-Object DiskNumber
-
-# Check disk health and schedule CheckDisk if necessary
-Write-Host "Checking partitions and disk health..."
 foreach ($partition in $partitionlist) {
     $driveLetter = ($partition.DriveLetter + ":")
     if ($driveLetter -ne ":") {
@@ -196,121 +178,116 @@ foreach ($partition in $partitionlist) {
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "CheckDisk scheduled successfully for $driveLetter on next reboot"
                 $Global:DiagMsg += "CheckDisk scheduled successfully for $driveLetter on next reboot"
+                $summary += "CheckDisk scheduled for $driveLetter"
             }
             else {
                 Write-Host "Failed to schedule CheckDisk for $driveLetter. Exit code: $LASTEXITCODE"
                 $Global:DiagMsg += "Failed to schedule CheckDisk for $driveLetter. Exit code: $LASTEXITCODE"
             }
         }
-        else {
-            Write-Host "$driveLetter dirty bit not set -> skipping chkdsk"
-            $Global:DiagMsg += "$driveLetter dirty bit not set -> skipping chkdsk"
-        }
         
-        # Run additional disk health checks
         Test-DiskHealth -DriveLetter $driveLetter
     }
 }
 
-# Run DISM and SFC on Windows Volumes
-Write-Host "Checking for Windows installations and running system file checks..."
-foreach ( $partitionGroup in $partitionlist | Group-Object DiskNumber ) {
-    Write-Host "Checking partition group for Windows installation"
-    $Global:DiagMsg += "Checking partition group for Windows installation"
-    #reset paths for each part group (disk)
-    $isOsPath = $false
-    $osPath = ''
-    $osDrive = ''
-
-    # Scan all partitions of a disk for bcd store and os file location 
-    ForEach ($drive in $partitionGroup.Group | Select-Object -ExpandProperty DriveLetter ) {      
-        if (-not $isOsPath -and $drive) {
-            $osPath = $drive + ':\windows\system32\winload.exe'
-            $isOsPath = Test-Path $osPath
-            if ($isOsPath) {
-                $osDrive = $drive + ':'
-            }
+# Check for Windows installations
+$windowsInstallations = @()
+foreach ($partition in $partitionlist) {
+    if (Test-Path ($partition.DriveLetter + ":\Windows\System32\winload.exe")) {
+        $windowsInstallations += @{
+            OsDrive = $partition.DriveLetter + ":"
+            OsPath  = $partition.DriveLetter + ":\Windows\System32\winload.exe"
         }
     }
+}
 
-    Write-Host "OsDrive: $OsDrive"
-    Write-Host "OsPath: $OsPath"
-    Write-Host "isOsPath: $isOsPath"
-    $Global:DiagMsg += "OsDrive: $OsDrive"
-    $Global:DiagMsg += "OsPath: $OsPath"
-    $Global:DiagMsg += "isOsPath: $isOsPath"
-
-    # Run DISM and SFC
-    if ( $isOsPath -eq $true ) {
-        Write-Host "Starting Windows image repair process..."
-        $Global:DiagMsg += "Starting Windows image repair process"
+if ($windowsInstallations.Count -eq 0) {
+    Write-Host "No Windows installations found."
+    $Global:DiagMsg += "No Windows installations found."
+    $summary += "No Windows installations detected"
+}
+else {
+    foreach ($windows in $windowsInstallations) {
+        Write-Host "Windows installation found on drive $($windows.OsDrive)"
+        $Global:DiagMsg += "Windows installation found on drive $($windows.OsDrive)"
+        
+        Write-Host "Starting Windows image repair process for $($windows.OsDrive)..."
+        $Global:DiagMsg += "Starting Windows image repair process for $($windows.OsDrive)"
         
         Write-Host "Reverting pending actions to Windows Image..."
-        $Global:DiagMsg += "Reverting pending actions to Windows Image"
         $dismResult = dism.exe /online /cleanup-image /revertpendingactions
-        Write-Host "DISM revert result: $dismResult"
-        $Global:DiagMsg += "DISM revert result: $dismResult"
+        Write-Host "DISM revert completed."
+        $Global:DiagMsg += "DISM revert completed"
+        $summary += "DISM pending actions reverted"
 
-        Write-Host "Running SFC on $osDrive\windows..."
-        $Global:DiagMsg += "Running SFC on $osDrive\windows"
-        $sfcOutput = & sfc /scannow
-        Write-Host "SFC output:"
-        $sfcOutput | ForEach-Object { 
-            Write-Host $_
-            $Global:DiagMsg += $_
-        }
+        Write-Host "Running SFC on $($windows.OsDrive)\windows..."
+        $sfcOutput = & sfc /scannow | Where-Object { $_ -match 'Windows Resource Protection' }
+        Write-Host $sfcOutput
+        $Global:DiagMsg += $sfcOutput
+        $summary += "SFC scan completed"
 
-        Write-Host "Running DISM to restore health on $osDrive..." 
-        $Global:DiagMsg += "Running DISM to restore health on $osDrive" 
+        Write-Host "Running DISM to restore health..."
         $dismRestoreResult = Dism.exe /Online /Cleanup-Image /RestoreHealth
-        Write-Host "DISM restore result: $dismRestoreResult"
-        $Global:DiagMsg += "DISM restore result: $dismRestoreResult"
+        Write-Host "DISM restore completed."
+        $Global:DiagMsg += "DISM restore completed"
+        $summary += "DISM health restore completed"
 
-        Write-Host "Enumerating potentially corrupt system files in $osDrive\windows\system32\..."
-        $Global:DiagMsg += "Enumerating potentially corrupt system files in $osDrive\windows\system32\"
-        $potentiallyCorruptFiles = Get-ChildItem -Path $osDrive\windows\system32\* -Include *.dll, *.exe | 
+        Write-Host "Checking for potentially corrupt system files..."
+        $potentiallyCorruptFiles = Get-ChildItem -Path "$($windows.OsDrive)\Windows\System32\*" -Include *.dll, *.exe | 
         Where-Object { Test-FileCorruption $_.FullName } |
         Select-Object FullName
         
         if ($potentiallyCorruptFiles) {
-            Write-Host "Potentially corrupt files found:"
-            $Global:DiagMsg += "Potentially corrupt files found:"
+            Write-Host "WARNING: Potentially corrupt files found that require further examination:"
+            $Global:DiagMsg += "WARNING: Potentially corrupt files found that require further examination:"
             foreach ($file in $potentiallyCorruptFiles) {
                 Write-Host $file.FullName
                 $Global:DiagMsg += $file.FullName
             }
+            $summary += "Potentially corrupt files detected"
         }
         else {
-            Write-Host "No potentially corrupt files found"
-            $Global:DiagMsg += "No potentially corrupt files found"
+            Write-Host "No critically corrupt files found"
+            $Global:DiagMsg += "No critically corrupt files found"
+            $summary += "No critically corrupt files detected"
         }
-    }      
+    }
 }
 
-# Check if the original events have been resolved
-Write-Host "Checking if original events have been resolved..."
-$Global:DiagMsg += "Checking if original events have been resolved"
+# Check for new events that occurred during remediation
 $newDiskEvents = Get-WinEvent -FilterHashtable @{
-    LogName = 'System'
-    ID      = @(7, 33, 57)
-} -ErrorAction SilentlyContinue
-
-if ($newDiskEvents.Count -lt $diskEvents.Count) {
-    Write-Host "Some disk-related events have been resolved"
-    $Global:DiagMsg += "Some disk-related events have been resolved"
+    LogName   = 'System'
+    StartTime = $scriptStartTime
+} -ErrorAction SilentlyContinue | Where-Object {
+    $diskEventSources -contains $_.ProviderName
 }
-elseif ($newDiskEvents.Count -eq $diskEvents.Count) {
-    Write-Host "No change in disk-related events. Further investigation may be needed."
-    $Global:DiagMsg += "No change in disk-related events. Further investigation may be needed."
+
+if ($newDiskEvents) {
+    Write-Host "WARNING: New disk-related events occurred during remediation:"
+    $Global:DiagMsg += "WARNING: New disk-related events occurred during remediation:"
+    foreach ($event in $newDiskEvents) {
+        $eventMessage = "Event ID: $($event.Id), Source: $($event.ProviderName), Message: $($event.Message)"
+        Write-Host $eventMessage
+        $Global:DiagMsg += $eventMessage
+    }
+    Write-Host "Actionable steps for the engineer:"
+    Write-Host "1. Review the new events in detail using Event Viewer"
+    Write-Host "2. Check disk health using manufacturer-specific tools"
+    Write-Host "3. Consider running extended hardware diagnostics"
+    Write-Host "4. If problems persist, consider disk replacement"
+    $summary += "New disk events occurred during remediation - further action required"
 }
 else {
-    Write-Host "WARNING: New disk-related events have occurred during remediation"
-    $Global:DiagMsg += "WARNING: New disk-related events have occurred during remediation"
+    Write-Host "No new disk-related events occurred during remediation"
+    $Global:DiagMsg += "No new disk-related events occurred during remediation"
+    $summary += "No new disk events during remediation"
 }
 
-Write-Host "Disk Health Remediation process completed."
-
-
+# Final summary
+Write-Host "`nDisk Health Remediation process completed. Summary of actions:"
+foreach ($item in $summary) {
+    Write-Host "- $item"
+}
 
 ######## End of Script ###########
 ##################################
