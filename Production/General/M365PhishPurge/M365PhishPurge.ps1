@@ -31,12 +31,6 @@ Write-Host
 Write-Host "Created by Alex Ivantsov @Exploitacious"
 Write-Host
 Write-Host
-Write-Host
-Write-Host "You may need to use an account with CA bypassed if your device is not registered in Azure/Intune"
-Write-Host
-Write-Host
-Write-Host -ForegroundColor Green "       -= Please Enter the Global Admin Credentials for the M365 Tenant =-  "
-Write-Host
 
 # Specify the log file path
 $logFile = Join-Path $PSScriptRoot "PurgeOp_$(Get-Date -Format 'yyyyMMdd_HH-mm').log"
@@ -214,13 +208,16 @@ function Confirm-EmailDeletion($searchName, $purgeType) {
     }
 }
 
+# Module Update Function
 function Update-Module {
     param (
         [string]$Module
     )
+    
+    $modulesSummary = @()
     $currentVersion = $null
     if ($null -ne (Get-InstalledModule -Name $Module -ErrorAction SilentlyContinue)) {
-        $currentVersion = (Get-InstalledModule -Name $module -AllVersions).Version
+        $currentVersion = (Get-InstalledModule -Name $module -AllVersions | Sort-Object Version -Descending)[0].Version
     }
 
     $CurrentModule = Find-Module -Name $module
@@ -228,61 +225,114 @@ function Update-Module {
     $status = "Unknown"
     $version = "N/A"
 
+    Write-Host "Checking status of module: $Module"
+
+    if ($Module -eq "ExchangeOnlineManagement") {
+        $minimumVersion = [System.Version]"3.2"
+        if ($currentVersion -lt $minimumVersion -or $null -eq $currentVersion) {
+            Write-Host "Status: ExchangeOnlineManagement module is not installed or below the minimum required version ($minimumVersion)."
+            Write-Host "Uninstalling any existing versions and installing the latest version."
+            
+            try {
+                if ($null -ne $currentVersion) {
+                    Uninstall-Module -Name $Module -AllVersions -Force
+                    Write-Host "Successfully uninstalled existing versions of ExchangeOnlineManagement."
+                }
+                
+                Install-Module -Name $Module -Force -AllowClobber
+                $newVersion = (Get-InstalledModule -Name $Module).Version
+                Write-Host "Successfully installed ExchangeOnlineManagement version $newVersion."
+                $status = "Updated"
+                $version = $newVersion
+            }
+            catch {
+                Write-Host "Status: Update failed"
+                Write-Host "Something went wrong with uninstalling or installing ExchangeOnlineManagement. Details:"
+                Write-Host -ForegroundColor red "$($_.Exception.Message)"
+                $status = "Update Failed"
+            }
+            
+            $modulesSummary += [PSCustomObject]@{
+                Module  = $Module
+                Status  = $status
+                Version = $version
+            }
+            return $modulesSummary
+        }
+    }
+
     if ($null -eq $currentVersion) {
+        Write-Host "Status: Not installed"
         Write-Host "$($CurrentModule.Name) - Installing $Module from PowerShellGallery. Version: $($CurrentModule.Version). Release date: $($CurrentModule.PublishedDate)"
         try {
             Install-Module -Name $module -Force
             $status = "Installed"
             $version = $CurrentModule.Version
+            Write-Host "Status: Successfully installed version $version"
         }
         catch {
+            Write-Host "Status: Installation failed"
             Write-Host "Something went wrong when installing $Module. Please uninstall and try re-installing this module. (Remove-Module, Install-Module) Details:"
-            Write-Host "$_.Exception.Message"
+            Write-Host "$($_.Exception.Message)"
             $status = "Installation Failed"
         }
     }
     elseif ($CurrentModule.Version -eq $currentVersion) {
-        Write-Host "$($CurrentModule.Name) is installed and ready. Version: ($currentVersion. Release date: $($CurrentModule.PublishedDate))"
+        Write-Host "Status: Up to date"
+        Write-Host "$($CurrentModule.Name) is installed and up to date. Version: $currentVersion. Release date: $($CurrentModule.PublishedDate)"
         $status = "Up to Date"
         $version = $currentVersion
     }
-    elseif ($currentVersion.count -gt 1) {
-        Write-Warning "$module is installed in $($currentVersion.count) versions (versions: $($currentVersion -join ' | '))"
+    elseif ((Get-InstalledModule -Name $module -AllVersions).Count -gt 1) {
+        Write-Host "Status: Multiple versions detected"
+        $allVersions = (Get-InstalledModule -Name $module -AllVersions).Version -join ' | '
+        Write-Warning "$module is installed in multiple versions (versions: $allVersions)"
         Write-Host "Uninstalling previous $module versions and will attempt to update."
         try {
             Get-InstalledModule -Name $module -AllVersions | Where-Object { $_.Version -ne $CurrentModule.Version } | Uninstall-Module -Force
+            Write-Host "Successfully uninstalled previous versions"
         }
         catch {
+            Write-Host "Status: Uninstallation of previous versions failed"
             Write-Host "Something went wrong with Uninstalling $Module previous versions. Please Completely uninstall and re-install this module. (Remove-Module) Details:"
-            Write-Host -ForegroundColor red "$_.Exception.Message"
+            Write-Host -ForegroundColor red "$($_.Exception.Message)"
             $status = "Uninstallation Failed"
+            $modulesSummary += [PSCustomObject]@{
+                Module  = $Module
+                Status  = $status
+                Version = $version
+            }
+            return $modulesSummary
         }
         
-        Write-Host "$($CurrentModule.Name) - Installing version from PowerShellGallery $($CurrentModule.Version). Release date: $($CurrentModule.PublishedDate)"  
+        Write-Host "$($CurrentModule.Name) - Installing latest version from PowerShellGallery $($CurrentModule.Version). Release date: $($CurrentModule.PublishedDate)"  
     
         try {
             Install-Module -Name $module -Force
-            Write-Host "$Module Successfully Installed"
+            Write-Host "Status: Successfully updated to version $($CurrentModule.Version)"
             $status = "Updated"
             $version = $CurrentModule.Version
         }
         catch {
+            Write-Host "Status: Update failed"
             Write-Host "Something went wrong with installing $Module. Details:"
-            Write-Host -ForegroundColor red "$_.Exception.Message"
+            Write-Host -ForegroundColor red "$($_.Exception.Message)"
             $status = "Update Failed"
         }
     }
     else {       
+        Write-Host "Status: Update available"
         Write-Host "$($CurrentModule.Name) - Updating from PowerShellGallery from version $currentVersion to $($CurrentModule.Version). Release date: $($CurrentModule.PublishedDate)" 
         try {
             Update-Module -Name $module -Force
-            Write-Host "$Module Successfully Updated"
+            Write-Host "Status: Successfully updated to version $($CurrentModule.Version)"
             $status = "Updated"
             $version = $CurrentModule.Version
         }
         catch {
+            Write-Host "Status: Update failed"
             Write-Host "Something went wrong with updating $Module. Details:"
-            Write-Host -ForegroundColor red "$_.Exception.Message"
+            Write-Host -ForegroundColor red "$($_.Exception.Message)"
             $status = "Update Failed"
         }
     }
@@ -291,6 +341,85 @@ function Update-Module {
         Module  = $Module
         Status  = $status
         Version = $version
+    }
+
+    return $modulesSummary
+}
+
+# Module Connect Funciton
+function Advanced-ConnectModule {
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("ExchangeOnline", "IPPSSession")]
+        [string]$ModuleName,
+        
+        [Parameter(Mandatory = $true)]
+        [System.Management.Automation.PSCredential]$Credential
+    )
+
+    Write-Host
+
+    try {
+        # Define a mapping of friendly names to actual module names
+        $moduleMapping = @{
+            "ExchangeOnline" = "ExchangeOnlineManagement"
+            "IPPSSession"    = "ExchangeOnlineManagement"  # IPPSSession is also part of ExchangeOnlineManagement
+        }
+
+        $actualModuleName = $moduleMapping[$ModuleName]
+
+        # Check if the module is installed
+        if (-not (Get-Module -ListAvailable -Name $actualModuleName)) {
+            Write-Host "Module $actualModuleName is not installed. Attempting to install..." -ForegroundColor Yellow
+            try {
+                Install-Module -Name $actualModuleName -Force -AllowClobber -Scope CurrentUser
+                Write-Host "Successfully installed $actualModuleName module." -ForegroundColor Green
+            }
+            catch {
+                Write-Host "Failed to install $actualModuleName module. Please install it manually and try again. Error: $_" -ForegroundColor Red
+                return $false
+            }
+        }
+
+        # Import the module
+        Import-Module $actualModuleName -ErrorAction Stop
+        $moduleVersion = (Get-Module $actualModuleName).Version
+        Write-Host "$actualModuleName module version $moduleVersion imported successfully." -ForegroundColor Green
+        Write-Host
+
+        # Connect to the module
+        switch ($ModuleName) {
+            "ExchangeOnline" {
+                Write-Host
+                Write-Host
+                Write-Host -ForegroundColor Yellow "Please satisfy MFA"
+                Write-Host
+                Connect-ExchangeOnline -UserPrincipalName $Credential.UserName -ShowBanner:$false -ErrorAction Stop
+                # Test the connection by running a simple query
+                $testResult = Get-AcceptedDomain | Where-Object { $_.Default -eq $true } | Select-Object -ExpandProperty DomainName
+                if (-not $testResult) {
+                    throw "Unable to retrieve primary domain name."
+                }
+                Write-Host "Successfully connected to Exchange Online. Primary domain: $testResult" -ForegroundColor Green
+                Write-Host
+            }
+            "IPPSSession" {
+                Connect-IPPSSession -UserPrincipalName $Credential.UserName -ShowBanner:$false -ErrorAction Stop
+                # Test the connection by running a simple query
+                $testResult = Get-OrganizationConfig | Select-Object -ExpandProperty Identity
+                if (-not $testResult) {
+                    throw "Unable to retrieve domain. Module may not be functional"
+                }
+                Write-Host "Successfully connected to Compliance Center. Microsoft Domain: $testResult" -ForegroundColor Green
+                Write-Host
+            }
+        }
+
+        return $true
+    }
+    catch {
+        Write-Host "Error connecting to $ModuleName : $_" -ForegroundColor Red
+        return $false
     }
 }
 
@@ -401,25 +530,46 @@ function Start-PhishPurgeProcess {
 Get-PSSession | Remove-PSSession
 Disconnect-ExchangeOnline -Confirm:$false -ErrorAction SilentlyContinue
 
+# Update Modules
+Write-Host "Checking Modules..."   
+Update-Module "ExchangeOnlineManagement"
+Update-Module "AIPService"
+
+# Get Creds and Log In
+Write-Host
+Write-Host
+Write-Host -ForegroundColor Yellow "You may need to use an account with CA bypassed if your device is not registered in Azure/Intune"
+Write-Host
+Write-Host -ForegroundColor Green "       -= Please Enter the Global Admin Credentials for the M365 Tenant =-  "
+Write-Host
+Write-Host
 try {
     $Credential = Get-Credential -ErrorAction Stop
 }
 catch {
     Write-Host -ForegroundColor Red "Credentials not entered. Exiting..."
+    Read-Host ":"
     exit
 }
-Write-Host
-
-# Update Modules   
-Update-Module "ExchangeOnlineManagement"
-Update-Module "AIPService"
-
-Write-Host
-Write-Host -ForegroundColor Green "Please satisfy MFA"
 
 # Connect to Security & Compliance Center and Exchange Online
-Connect-IPPSSession -UserPrincipalName $Credential.UserName
-Connect-ExchangeOnline -UserPrincipalName $Credential.UserName
+if (Advanced-ConnectModule -ModuleName "ExchangeOnline" -Credential $Credential) {
+    Write-Host "Exchange Online connection successful. Ready to continue." -ForegroundColor Green
+}
+else {
+    Write-Host -ForegroundColor Red "Exchange Admin Center Connection Unsuccessful. Exiting..."
+    Read-Host ":"
+    exit
+}
+
+if (Advanced-ConnectModule -ModuleName "IPPSSession" -Credential $Credential) {
+    Write-Host "Compliance Center connection successful. Ready to continue." -ForegroundColor Green
+}
+else {
+    Write-Host -ForegroundColor Red "Compliance Center Connection Unsuccessful. Exiting..."
+    Read-Host ":"
+    exit
+}
 
 Write-Host
 Write-Host "There should be no errors thus far. If you see any red, please exit the script with Ctrl-C and try again."
@@ -447,4 +597,4 @@ Write-Host
 Display-LogFile $logFile
 Write-Host
 Write-Host "Script execution completed. Use the above output to paste into the ticket before closing it."
-Read-Host "All sessions have been disconnected. Press Enter to continue"
+Read-Host "All sessions have been disconnected. Press any key to EXIT"
