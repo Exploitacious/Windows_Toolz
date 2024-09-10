@@ -28,12 +28,13 @@ You can use as many of these as you like.
 Below you will find all the standard variables to use with Datto RMM to interract with all the the visual, alert and diagnostics cues available from the dashboards.
 #># DattoRMM Alert Functions. Don't touch these unless you know what you're doing.
 function write-DRMMDiag ($messages) {
-    Write-Host  '<-Start Diagnostic->'
+    Write-Host  "`n<-Start Diagnostic->"
     foreach ($Message in $Messages) { $Message + ' `' }
     Write-Host '<-End Diagnostic->'
+    Write-Host
 }
 function write-DRMMAlert ($message) {
-    Write-Host '<-Start Result->'
+    Write-Host "`n<-Start Result->"
     Write-Host "STATUS=$message"
     Write-Host '<-End Result->'
 }

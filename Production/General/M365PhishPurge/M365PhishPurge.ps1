@@ -73,7 +73,7 @@ Add-Type -AssemblyName System.Drawing
 function Show-InputBoxDialog([string]$message, [string]$title, [string]$defaultText) {
     $form = New-Object System.Windows.Forms.Form
     $form.Text = $title
-    $form.Size = New-Object System.Drawing.Size(400, 450)
+    $form.Size = New-Object System.Drawing.Size(400, 480)
     $form.StartPosition = 'CenterScreen'
 
     $label = New-Object System.Windows.Forms.Label
@@ -119,14 +119,20 @@ function Show-InputBoxDialog([string]$message, [string]$title, [string]$defaultT
     $blockSenderCheckBox.Text = "Add sender to blocklist"
     $form.Controls.Add($blockSenderCheckBox)
 
+    $reportPhishCheckBox = New-Object System.Windows.Forms.CheckBox
+    $reportPhishCheckBox.Location = New-Object System.Drawing.Point(10, 250)
+    $reportPhishCheckBox.Size = New-Object System.Drawing.Size(360, 20)
+    $reportPhishCheckBox.Text = "Report to Microsoft (This email should have been blocked)"
+    $form.Controls.Add($reportPhishCheckBox)
+
     $instructionsLabel = New-Object System.Windows.Forms.Label
-    $instructionsLabel.Location = New-Object System.Drawing.Point(10, 250)
+    $instructionsLabel.Location = New-Object System.Drawing.Point(10, 280)
     $instructionsLabel.Size = New-Object System.Drawing.Size(380, 80)
-    $instructionsLabel.Text = "Instructions:`r`n- Subject is required`r`n- Sender and recipient are optional`r`n- Select the date the email was received`r`n- Choose purge type (Soft/Hard Delete)`r`n- Check the box to add sender to blocklist"
+    $instructionsLabel.Text = "Instructions:`r`n- Subject is required`r`n- Sender and recipient are optional`r`n- Date Received is optional`r`n- Choose purge type (Soft/Hard Delete)`r`n- Check boxes to add sender to tenant blocklist and/or report to Microsoft"
     $form.Controls.Add($instructionsLabel)
 
     $okButton = New-Object System.Windows.Forms.Button
-    $okButton.Location = New-Object System.Drawing.Point(75, 340)
+    $okButton.Location = New-Object System.Drawing.Point(75, 370)
     $okButton.Size = New-Object System.Drawing.Size(75, 23)
     $okButton.Text = 'OK'
     $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
@@ -134,7 +140,7 @@ function Show-InputBoxDialog([string]$message, [string]$title, [string]$defaultT
     $form.Controls.Add($okButton)
 
     $cancelButton = New-Object System.Windows.Forms.Button
-    $cancelButton.Location = New-Object System.Drawing.Point(150, 340)
+    $cancelButton.Location = New-Object System.Drawing.Point(150, 370)
     $cancelButton.Size = New-Object System.Drawing.Size(75, 23)
     $cancelButton.Text = 'Cancel'
     $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
@@ -151,6 +157,7 @@ function Show-InputBoxDialog([string]$message, [string]$title, [string]$defaultT
             SentDate    = $sentDatePicker.Value.ToString("MM/dd/yyyy")
             PurgeType   = $purgeTypeComboBox.SelectedItem
             BlockSender = $blockSenderCheckBox.Checked
+            ReportPhish = $reportPhishCheckBox.Checked
         }
     }
     else {
@@ -423,7 +430,48 @@ function Advanced-ConnectModule {
     }
 }
 
-# Main logic for Search and Purge
+# Function to retrieve MessageIDs from Compliance Search Results
+function Get-MessageIDsFromSearch {
+    param (
+        [string]$searchName
+    )
+    try {
+        # Retrieve the compliance search action details for the Search (before Purge)
+        $searchResults = Get-ComplianceSearch -Identity $searchName | Select-Object -ExpandProperty SearchStatistics
+        
+        # Extract MessageIDs from the results
+        $messageIds = @()
+        foreach ($result in $searchResults) {
+            if ($result -match 'MessageId:\s+(.+)$') {
+                $messageIds += $matches[1]
+            }
+        }
+
+        return $messageIds
+    }
+    catch {
+        Write-Log "Failed to retrieve Message IDs: $_"
+        return $null
+    }
+}
+
+# Function to report phishing emails to Microsoft
+function Report-PhishToMicrosoft {
+    param (
+        [string]$messageId,
+        [string]$recipientEmail
+    )
+    try {
+        # Report each message to Microsoft as phishing
+        New-MailMessageReport -ReportType Phishing -MessageID $messageId -RecipientAddress $recipientEmail
+        Write-Log "Reported message $messageId to Microsoft as phishing."
+    }
+    catch {
+        Write-Log "Failed to report message to Microsoft: $_"
+    }
+}
+
+# Main logic for Search, Report, and Purge
 function Start-PhishPurgeProcess {
     try {
         # Show input dialog and get search criteria
@@ -434,7 +482,6 @@ function Start-PhishPurgeProcess {
             exit
         }
 
-        # The rest of your logic
         # Construct content match query (simplified)
         $contentMatchQuery = "subject:`"$($searchCriteria.Subject)`""
         if ($searchCriteria.From -ne "Enter sender email (optional)") {
@@ -461,6 +508,14 @@ function Start-PhishPurgeProcess {
 
         # Display detailed search results
         Display-SearchResults $searchName
+
+        # Report phishing if the option was selected
+        if ($searchCriteria.ReportPhish -and $searchCriteria.To -ne "Enter recipient email (optional)") {
+            $messageIds = Get-MessageIDsFromSearch -searchName $searchName
+            foreach ($messageId in $messageIds) {
+                Report-PhishToMicrosoft -messageId $messageId -recipientEmail $searchCriteria.To
+            }
+        }
 
         # Prompt user for confirmation before purging
         Write-Host

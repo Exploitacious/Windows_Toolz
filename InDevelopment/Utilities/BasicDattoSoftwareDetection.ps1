@@ -24,21 +24,60 @@ function Check-SoftwareInstall {
     )
 
     $varCounter = 0
+    $Detection = @()
+    $DetectionLocation = ""
+    $DetectedData = @()
 
-    $Detection = Get-ChildItem ("HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\SOFTWARE") | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName, $_.BrandName -match "$SoftwareName" } | Select-Object
+    # Registry paths to search
+    $regPaths = @(
+        "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+        "HKLM:\SOFTWARE"
+    )
 
-    if ($Null -ne $Detection) {
-        $varCounter ++
+    foreach ($regPath in $regPaths) {
+        $foundItems = Get-ChildItem -Path $regPath -ErrorAction SilentlyContinue | ForEach-Object { 
+            Get-ItemProperty $_.PSPath 
+        } | Where-Object { $_.DisplayName -match "$SoftwareName" -or $_.BrandName -match "$SoftwareName" }
+
+        if ($foundItems) {
+            foreach ($foundItem in $foundItems) {
+                $varCounter++
+
+                # Store the display name
+                $Detection += $foundItem.DisplayName
+
+                # Store the registry path where the software was found
+                $DetectionLocation = $regPath
+
+                # Capture relevant details about the software
+                $DetectedData += [PSCustomObject]@{
+                    DisplayName     = $foundItem.DisplayName
+                    Publisher       = $foundItem.Publisher
+                    Version         = $foundItem.DisplayVersion
+                    InstallDate     = $foundItem.InstallDate
+                    InstallLocation = $foundItem.InstallLocation
+                    UninstallString = $foundItem.UninstallString
+                    RegistryPath    = $regPath
+                }
+            }
+        }
     }
-    else {
-        $varCounter = 0
-    }
 
+    # Return detected state and relevant data
     if ($Method -eq 'EQ') {
-        return $varCounter -ge 1
+        return @{
+            Detected     = ($varCounter -ge 1)
+            Location     = $DetectionLocation
+            DetectedData = $DetectedData
+        }
     }
     elseif ($Method -eq 'NE') {
-        return $varCounter -lt 1
+        return @{
+            Detected     = ($varCounter -lt 1)
+            Location     = $DetectionLocation
+            DetectedData = $DetectedData
+        }
     }
     else {
         throw "Invalid method. Please use 'EQ' or 'NE'."
@@ -46,7 +85,20 @@ function Check-SoftwareInstall {
 }
 
 # Example usage:
-$softwareName = "Lenovo System Update"
+$softwareName = "SNAP"
 $method = 'EQ'
 $result = Check-SoftwareInstall -SoftwareName $softwareName -Method $method
-Write-Host "Result: $result"
+
+Write-Host
+Write-Host "Detected: $($result.Detected)" -ForegroundColor Blue
+Write-Host
+$result.DetectedData | ForEach-Object { 
+    Write-Host "Display Name: $($_.DisplayName)"
+    Write-Host "Publisher: $($_.Publisher)"
+    Write-Host "Version: $($_.Version)"
+    Write-Host "Install Date: $($_.InstallDate)"
+    Write-Host "Install Location: $($_.InstallLocation)"
+    Write-Host "Uninstall String: $($_.UninstallString)"
+    Write-Host "Registry Path: $($_.RegistryPath)"
+    Write-Host "`n"
+}
