@@ -1,4 +1,8 @@
-## Set Veriables for the Meraki VPN and Easily Deploy it with a PS1 script. WIll use split-tunneling, and will add a static route to your 
+## Set Veriables for the Meraki VPN and Easily Deploy it with a PS1 script. Will use split-tunneling, and will add a static route to your IP Tables
+
+#Elevate Admin
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
+
 
 [void][Reflection.Assembly]::LoadWithPartialName('Microsoft.VisualBasic')
 
