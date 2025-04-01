@@ -6,6 +6,7 @@ Start-Sleep 3
 if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
 $InstallPrograms = @(
+    #"Romanitho.Winget-AutoUpdate" # Winget Auto Update, the best package there is. https://github.com/Romanitho/Winget-AutoUpdate Not using Winget cause it's not consistent
     "Company Portal"
     "9N0DX20HK701" # Windows Terminal
     "9NRX63209R7B" # Outlook (NEW) for Windows
@@ -13,15 +14,17 @@ $InstallPrograms = @(
     "7zip.7zip"
     "Zoom.Zoom"
     "Microsoft.Teams" # Microsoft Teams (New)
+    "Microsoft.Edge"
+    "Microsoft.PowerToys"
 )
 
-# Install WinGet, Update Apps, and Install Specified Apps
+### Download and install the latest Winget Auto Update
+# Set WAU Variables
+$WAUPath = "C:\Temp\Romanitho-WindowsAutoUpdate"
+$repo = "Romanitho/Winget-AutoUpdate"
+$apiUrl = "https://api.github.com/repos/$repo/releases/latest"
 
-### Refresh and Download the latest Winget Auto Update
-$WAUPath = "C:\Temp\WAU_Latest"
-$WAUurl = "https://github.com/Romanitho/Winget-AutoUpdate/zipball/master/"
-$WAUFile = "$WAUPath\WAU_latest.zip"
-# Refresh the directory to allow download and install of latest version
+# Test and Create Path
 if ((Test-Path -Path $WAUPath)) {
     Remove-Item $WAUPath -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Path $WAUPath
@@ -30,20 +33,28 @@ else {
     New-Item -ItemType Directory -Path $WAUPath
 }
 
-# Download Winget AutoUpdate
-Invoke-WebRequest -Uri $WAUurl -o $WAUFile
-Expand-Archive $WAUFile -DestinationPath $WAUPath -Force
-Remove-Item $WAUFile -Force
+# GitHub blocks requests without a User-Agent header
+$response = Invoke-RestMethod -Uri $apiUrl -Headers @{ "User-Agent" = "AnythingReally" }
 
-# Move Items around to remove extra directories
-Move-Item "$WAUPath\Romanitho*\*" $WAUPath
-Remove-Item "$WAUPath\Romanitho*\"
+# Find the .msi asset (you can filter differently if needed)
+$asset = $response.assets | Where-Object { $_.name -like "*.msi" } | Select-Object -First 1
 
-### Execute Winget + Auto Update Installation
-& "$WAUPath\Sources\WAU\Winget-AutoUpdate-Install.ps1" -Silent -InstallUserContext -NotificationLevel None -UpdatesAtLogon -UpdatesInterval Daily -DoNotUpdate
+if ($asset -ne $null) {
+    $downloadUrl = $asset.browser_download_url
+    Write-Output "Latest MSI URL: $downloadUrl"
+
+    # Optional: Download it
+    Invoke-WebRequest -Uri $downloadUrl -OutFile "$WAUPath\WAU_latest.msi"
+}
+else {
+    Write-Error "No MSI asset found in the latest release."
+}
+
+### Execute Winget Auto Update Silent Installation
+& "$WAUPath\WAU_latest.msi" /qn RUN_WAU=YES STARTMENUSHORTCUT=1 NOTIFICATIONLEVEL=None
 
 
-# Install Apps
+# Install Winget Apps
 Write-Host "Installing Applications..."
 Foreach ($NewApp in $InstallPrograms) {
     $listApp = winget list --exact -q $NewApp --accept-source-agreements --accept-package-agreements
@@ -55,5 +66,6 @@ Foreach ($NewApp in $InstallPrograms) {
         Write-host $NewApp " already installed."
     }
 }
+
 
 Read-Host -Prompt "Finished! Press Enter to exit"

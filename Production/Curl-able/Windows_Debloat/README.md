@@ -4,7 +4,7 @@ This collection of PowerShell scripts is designed to optimize and customize Wind
 
 ## Scripts Overview
 
-### 1. Windows System-wide Customization Script
+### 1. Windows System-wide Customization
 
 **Purpose**: Optimizes Windows 10/11 for business environments by modifying system-wide settings.
 
@@ -12,12 +12,12 @@ This collection of PowerShell scripts is designed to optimize and customize Wind
 
 - Enhances privacy and security settings
 - Disables telemetry and data collection
-- Customizes UI and UX settings
+- Customizes UI and UX settings to be more like Windows 10 with classic elements
 - Optimizes system performance
 - Configures Windows features
-- Applies specific Windows 11 optimizations (if applicable)
+- Applies specific Windows optimizations
 
-### 2. Windows User-Specific Customization Script
+### 2. Windows User-Specific Customization
 
 **Purpose**: Optimizes Windows 10/11 user settings without requiring administrative privileges.
 
@@ -30,9 +30,9 @@ This collection of PowerShell scripts is designed to optimize and customize Wind
 - Removes pre-installed bloatware
 - Installs specified applications using Winget
 - Updates PowerShell modules and Windows
-- Creates a first-time logon script for new user profiles
+- Creates a first-time logon script for all new user profiles
 
-### 3. Winget Application Installation Script
+### 3. Winget Application Installation
 
 **Purpose**: Automates the installation of applications using Winget package manager.
 
@@ -42,7 +42,7 @@ This collection of PowerShell scripts is designed to optimize and customize Wind
 - Installs a predefined list of applications using Winget
 - Handles both Microsoft Store apps and traditional Windows applications
 
-### 4. PowerShell Module and Windows Update Script
+### 4. PowerShell Module and Windows Update
 
 **Purpose**: Updates PowerShell modules and runs Windows Updates.
 
@@ -54,7 +54,7 @@ This collection of PowerShell scripts is designed to optimize and customize Wind
 - Runs Windows Updates
 - Ensures Microsoft Update service is registered and active
 
-### 5. Windows Bloatware Removal Script
+### 5. Windows Bloatware Removal
 
 **Purpose**: Removes pre-installed bloatware from Windows systems.
 
