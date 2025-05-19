@@ -31,7 +31,7 @@
     
     cd "C:\Temp\GatherLogs"
 
-    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/WindowsEventsToCSVTimeline/master/Gather-LogsToTimeLine.ps1', 'Gather-LogsToTimeLine.ps1')"
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/refs/heads/main/Curl-able/Windows_Events_Audit/CollectLogs.ps1', 'Gather-LogsToTimeLine.ps1')"
 
 
 :: Start Running the Gather Logs scripts
