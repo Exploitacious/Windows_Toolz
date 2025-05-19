@@ -25,10 +25,10 @@
     :: List of files to download
     echo Downloading Files...
 
-    :: Base URL for downloading files
-    set baseURL=https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Production/Curl-able/Windows_Debloat/
+:: Base URL for downloading files
+    set "baseURL=https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/Curl-able/Windows_Debloat"
 
-    :: Loop through each file and download it using PowerShell
+:: Loop through each file and download it using PowerShell
     for %%f in (
         "Cmd-HKCU.cmd"
         "Cmd-HKLM.cmd"
@@ -40,7 +40,8 @@
         "UninstallBloat.ps1"
         "Main-Stager.ps1"
     ) do (
-        PowerShell -NoProfile -ExecutionPolicy Bypass -Command "(New-Object Net.WebClient).DownloadFile('%baseURL%%%~f', '%%~f')"
+        echo Downloading %%~f...
+        curl -L "%baseURL%/%%~f" -o "%%~f"
     )
 
 :: Function to run the main debloat script
