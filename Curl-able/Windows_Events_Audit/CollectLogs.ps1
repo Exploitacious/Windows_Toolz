@@ -5,7 +5,7 @@
         * Gather‑SecurityLogs   – Collects logs (default: security channels only) and saves them as .csv/.evtx.
         * Parse‑SecurityTimeline – Reads those exports (or any supplied folder) and produces a consolidated CSV sorted chronologically across hosts.
 
-        
+
     Example usage:
 
     # Collect only security‑related channels and immediately build timeline
@@ -47,7 +47,7 @@ function Gather-SecurityLogs {
     )
 
     if (-not (Test-IsAdmin)) {
-        throw 'Administrator rights are required.  Re‑launch PowerShell as admin.'
+        throw 'Administrator rights are required'
     }
 
     if (-not (Test-Path $OutputPath)) {
@@ -91,7 +91,7 @@ function Gather-SecurityLogs {
             }
         }
         catch {
-            Write-Warning "Failed to export $log – $($_.Exception.Message)"
+            Write-Warning "Failed to export $log - $($_.Exception.Message)"
         }
     }
 
@@ -100,14 +100,8 @@ function Gather-SecurityLogs {
 }
 
 
-# Parallel Helper (CookieMonster)
+# Parallel Helper
 function Invoke-Parallel {
-    <#
-.SYNOPSIS
-    Simplified runspace‑based parallel foreach.
-.DESCRIPTION
-    Embedded copy taken from CookieMonster/Invoke-Parallel (MIT) with minimal edits.
-#>
     param(
         [Parameter(ValueFromPipeline = $true)]$InputObject,
         [scriptblock]$ScriptBlock,
@@ -172,7 +166,7 @@ function Parse-SecurityTimeline {
     $allCsv = Get-ChildItem -Path $LogFolder -Filter *.csv -Recurse
 
     if (-not $allCsv) {
-        throw 'No CSV log exports found – ensure Gather-SecurityLogs has been executed.'
+        throw 'No CSV log exports found - ensure Gather-SecurityLogs has been executed.'
     }
 
     $rows = [System.Collections.Concurrent.ConcurrentBag[pscustomobject]]::new()
@@ -239,6 +233,3 @@ function Export-SecurityTimeline {
             -Threads $Threads -ThreadTimeout $ThreadTimeout -StartTime $StartTime -EndTime $EndTime
     }
 }
-
-
-
