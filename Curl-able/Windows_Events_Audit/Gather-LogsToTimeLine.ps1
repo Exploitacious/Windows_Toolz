@@ -1,132 +1,121 @@
 ﻿<#
-    .SYNOPSIS 
-        Gather Event Logs from the current Windows system and place them in to a folder of your choosing.
-    .DESCRIPTION 
-        Gathers All Event Logs from Windows 7/2008R2 and newer operating systems.
-		
-		Requires Powershell Version 2+ and an ExecutionPolicy of 'unrestricted'.
-		
-		By default, all logs that can be gathered with Get-EventLog will be parsed immediately as it is the fastest possible method.
-		This behavior can be changed with the excludeEvtxFiles and IncludeAllEvtxFiles parameters.
-		
-		Output is sorted in a single folder. It can then be compressed and moved over to another system for parsing.
-		
-		This script does not delete or clear any event logs.
-    .PARAMETER Output  
-        The folder where all event logs will be saved. Absolute and relative paths are allowed
-    .PARAMETER excludeEvtxFiles  
-        A comma separated list of all logs this script should just parse now instead of gathering the .evtx file for parsing. Default is any log that can be gathered with Get-EventLog (This is the fastest mode possible)
-    .PARAMETER IncludeAllEvtxFiles  
-        Gathers evtx files for all logs excluded under the "excludeEvtxFiles" parameter. This doesn't slow down collection too much but allows you to use the evtx files in other tools.
-	.PARAMETER LogTag  
-        Prepends a string of your choosing to the all collected log files. Default is the local computer name.
-    .EXAMPLE 
-        .\Gather-LogsToTimeLine.ps1 -output "c:\Logs"
-		Places all Event Logs into the folder "C:\Logs". The folder will be created if it does not already exist.
-	.EXAMPLE 
-        .\Gather-LogsToTimeLine.ps1 -output "c:\Logs" -excludeEvtxFiles Security,System
-		Places all Event Logs into the folder "C:\Logs". The folder will be created if it does not already exist. Only the Security and System log will be parsed immediately. The rest will be exported as evtx files.
-	.EXAMPLE 
-        .\Gather-LogsToTimeLine.ps1 -output "c:\Logs" -excludeEvtxFiles Security,System -IncludeAllEvtxFiles
-		Places all Event Logs into the folder "C:\Logs". The folder will be created if it does not already exist. Only the Security and System log will be parsed immediately. All Logs (Including Security and System) will be exported as evtx files.
-		
-    .NOTES 
-        Author: @piesecurity - https://twitter.com/piesecurity - admin@pie-secure.org       
-        LEGAL:
-        This program is free software: you can redistribute it and/or modify
-        it under the terms of the GNU General Public License as published by
-        the Free Software Foundation, either version 3 of the License, or
-        (at your option) any later version.
-    
-        This program is distributed in the hope that it will be useful,
-        but WITHOUT ANY WARRANTY; without even the implied warranty of
-        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-        GNU General Public License for more details.
-        You should have received a copy of the GNU General Public License
-        along with this program.  If not, see <http://www.gnu.org/licenses/>.
-    #>
+.SYNOPSIS
+    Gathers All Event Logs from Windows 7/2008R2 and newer operating systems. Export **all** Windows Event Logs to per-log CSV files
+
+.DESCRIPTION
+    • Works on PowerShell 5.1
+    • Caches SID-to-account translations (biggest time-saver).  
+    • Shows Write-Progress so you can watch it crawl.  
+    • Still supports -excludeEvtxFiles and -IncludeAllEvtxFiles switches.  
+    • Writes one UTF-8 CSV per log:  <LogTag>-<LogName>.csv
+#>
+
 [CmdletBinding()]
-Param (
-    [Parameter(Mandatory=$false)]
-    [string]$output=".\Logs",
-    [Parameter(Mandatory=$false)]
-    $excludeEvtxFiles = ((get-eventlog -list) | foreach-object{$_.log}),
-    [Parameter(Mandatory=$false)]
-    $logTag = $env:ComputerName,
-    [Parameter(Mandatory=$false)]
-    [switch]$IncludeAllEvtxFiles
+param(
+    [string]  $output = "C:\Logs\" + "LogExport_" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss"), # default to current time
+    [string[]]$excludeEvtxFiles = @(), # nothing excluded unless you pass names
+    [string]  $logTag = $env:COMPUTERNAME,
+    [switch]  $IncludeAllEvtxFiles
 )
 
+# ---------------------------------------------------------------------------
+# CONFIG – put the Event IDs you never want in the CSV right here.
+# Example: CPU microcode spam (4), useless Kerb stuff (16), etc. Check the description for details
+[int[]]$SkipEventIds = @(4, 6, 13, 42, 98, 142, 7036, 10010, 10016, 1014, 10, 1033, 102, 103, 400, 403, 4703) # add/remove IDs
+# ---------------------------------------------------------------------------
 
+#--- admin check (skip if you know you’re SYSTEM) -----------------------------
 function Test-Admin {
-    $currentUser = New-Object Security.Principal.WindowsPrincipal $([Security.Principal.WindowsIdentity]::GetCurrent())
-    return $currentUser.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+    $p = New-Object Security.Principal.WindowsPrincipal $([Security.Principal.WindowsIdentity]::GetCurrent())
+    $p.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+}
+if (-not (Test-Admin)) { Write-Error "Run as admin needed."; exit 1 }
+
+#--- prep --------------------------------------------------------------------
+$null = New-Item -Path $output -ItemType Directory -Force
+$UtcFmt = 'yyyy-MM-dd HH:mm:ss'
+$SidCache = @{}
+
+function Resolve-SidCached {
+    param([string]$Sid)
+    if (-not $Sid) { return $null }
+    if ($SidCache.ContainsKey($Sid)) { return $SidCache[$Sid] }
+
+    try {
+        $name = ([System.Security.Principal.SecurityIdentifier]$Sid
+        ).Translate([System.Security.Principal.NTAccount]).Value 
+    }
+    catch { $name = $Sid }   # unresolved ⇒ keep SID
+
+    $SidCache[$Sid] = $name
+    return $name
 }
 
-if ((Test-Admin) -eq $false) {
-    Write-Error "Script Not Ran as Admin"
-    exit
+#--- decide which logs to touch ----------------------------------------------
+$logs = Get-WinEvent -ListLog * -ErrorAction SilentlyContinue | Where-Object { $_.RecordCount -gt 0 }
+if (-not $IncludeAllEvtxFiles) {
+    $logs = $logs | Where-Object { $excludeEvtxFiles -notcontains $_.LogName }
 }
 
-write-host "Checking For Output Directory"
-if (!(test-path $output)) {
-write-host "Creating Output Directory $output"
-    mkdir $output | Out-Null
+$total = $logs.Count
+if ($total -eq 0) { Write-Warning "No logs selected. Exiting."; return }
+
+# Build the XPath once (or $null if nothing to skip)
+$SkipXPath = $null
+if ($SkipEventIds.Count) {
+    $clauses = ( $SkipEventIds | ForEach-Object { "(EventID!=$_)" } ) -join ' and '
+    $SkipXPath = "*[System[$clauses]]"
 }
 
-if ($excludeEvtxFiles) {
-    $excludeEvtxFiles | ForEach-Object {
-        $LogName = "$LogTag-" + $_
-        write-host "Dumping $_ Event Log to CSV"
-        Try {
-            Get-EventLog $_ -ErrorAction Stop |
-                select @{name="containerLog";expression={$LogName}},
-                    @{name="id";expression={$_.EventID}},
-                    @{name="levelDisplayName";expression={$_.EntryType}},
-                    MachineName,
-                    @{name="LogName";expression={$LogName}},
-                    ProcessId,
-                    @{name="UserId";expression={$_.UserName}},
-                    @{name="ProviderName";expression={$_.source}},
-                    @{Name="TimeCreated";expression={(($_.TimeGenerated).ToUniversalTime()).ToString('yyyy-MM-dd HH:mm:ssZ')}},
-                    @{Name="Message";expression={$_.message -replace "\r\n"," | " -replace "\n", " | " -replace "The local computer may not have the necessary registry information or message DLL files to display the message, or you may not have permission to access them.",""}} | 
-               Export-Csv -NoTypeInformation ($output + "\" + "$LogTag-" + $_ + ".csv")
+Write-Host "`nExporting $total logs to CSV → $output`n"
+
+# --- main loop (sequential, with progress bar) ------------------------------
+$index = 0
+foreach ($log in $logs) {
+
+    $index++
+    Write-Progress -Activity "Exporting logs" `
+        -Status  ("{0}/{1}  {2}" -f $index, $total, $log.LogName) `
+        -PercentComplete ([int](100 * $index / $total))
+
+    $nameSafe = $log.LogName -replace '/', '%4'
+    $csvPath = Join-Path $output "$logTag-$nameSafe.csv"
+
+    try {
+        # apply XPath filter only if we have one
+        if ($SkipXPath) {
+            $events = Get-WinEvent -LogName $log.LogName -FilterXPath $SkipXPath -ErrorAction Stop
         }
-        Catch {
-            write-host "Previous Log doesn't have any records. No output will be produced"
+        else {
+            $events = Get-WinEvent -LogName $log.LogName -ErrorAction Stop
         }
-        
+
+        $objects = $events | ForEach-Object {
+            [pscustomobject]@{
+                containerLog     = "$logTag-$nameSafe"
+                id               = $_.Id
+                levelDisplayName = $_.LevelDisplayName
+                MachineName      = $_.MachineName
+                LogName          = $log.LogName
+                ProcessId        = $_.ProcessId
+                UserId           = Resolve-SidCached $_.UserId
+                ProviderName     = $_.ProviderName
+                TimeCreated      = ($_.TimeCreated.ToUniversalTime()).ToString($UtcFmt)
+                Message          = ($_.Message -replace "\r?\n", ' | ')
+            }
+        }
+
+        $objects | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8 -Force
+    }
+    catch {
+        Write-Warning "   !  $($log.LogName) blew up: $($_.Exception.Message)"
     }
 }
-write-host "Dump All Operational Logs Event Log With Tag: $logtag Excluding: $excludeEvtxFiles"
 
-Get-WinEvent -ListLog * | where-object {$_.recordcount -gt 0} | where-object {$excludeEvtxFiles -notcontains $_.LogName} |
-ForEach-Object {
-    wevtutil epl $_.LogName  ($output + "\" + "$LogTag-" + ($_.LogName -replace "/","%4") +".evtx")
-}
+Write-Progress -Activity "Exporting logs" -Completed -Status "Done"
+Write-Host "`nFinished. SID cache size: $($SidCache.Count)`n"
 
-write-host "Adding Event Context to exported evtx files"
-Get-ChildItem $output\*.evtx | ForEach-Object {
-    wevtutil archive-log $_ /l:en-us
-}
-
-if ($IncludeAllEvtxFiles) {
-    write-host "Gathering Evtx Files for all previously excluded files"
-    $excludeEvtxFiles | ForEach-Object {
-        wevtutil epl $_ ($output + "\" + "$LogTag-" + ($_ -replace "/","%4") +".evtx")
-    }
-    write-host "Adding Event Context to previously excluded files"
-    $excludeEvtxFiles | foreach-object {
-        Get-ChildItem ($output +"\" + $LogTag + "-" + $_ + ".evtx") | ForEach-Object {
-            wevtutil archive-log $_ /l:en-us
-        }
-    }
-}
-
+Write-Host
+Write-Host
 write-host "Completed the log gathering. Launching the Parser"
-
-Set-Location C:\Temp\GatherLogs
-
-$MachineName = $env:computername
-
-.\Parse-LogsToTimeLine.ps1 -LogFolder "C:\Temp\GatherLogs\Logs" -outputfile LogsTimeline_$MachineName.csv
+.\Parse-LogsToTimeLine.ps1

@@ -1,6 +1,6 @@
 :: Quickly and quietly run both scripts to gather and parse logs
 :: Download and run the scripts directly from GitHub
-:: Created by: PieSecurity (https://github.com/piesecurity) & Alex Ivantsov 
+:: Created by Alex Ivantsov 
 
 @echo off
 
@@ -31,14 +31,21 @@
     
     cd "C:\Temp\GatherLogs"
 
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/refs/heads/main/Curl-able/Windows_Events_Audit/EventLogLauncher.ps1', 'EventLogLauncher.ps1')"
+
     PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/refs/heads/main/Curl-able/Windows_Events_Audit/Gather-LogsToTimeLine.ps1', 'Gather-LogsToTimeLine.ps1')"
 
     PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/refs/heads/main/Curl-able/Windows_Events_Audit/Parse-LogsToTimeLine.ps1', 'Parse-LogsToTimeLine.ps1')"
+
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/refs/heads/main/Curl-able/Windows_Events_Audit/BaselineSettings.ps1', 'BaselineSettings.ps1')"
+
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/refs/heads/main/Curl-able/Windows_Events_Audit/ClearWindowsEventLog.ps1', 'ClearWindowsEventLog.ps1')"
+
 
 
 :: Start Running the Gather Logs scripts
 :RunScript
 
     SET ScriptDirectory=C:\Temp\GatherLogs\
-    SET PowerShellScriptPath=%ScriptDirectory%Gather-LogsToTimeLine.ps1
+    SET PowerShellScriptPath=%ScriptDirectory%EventLogLauncher.ps1
     PowerShell -NoProfile -ExecutionPolicy Bypass -Command "%PowerShellScriptPath%";
