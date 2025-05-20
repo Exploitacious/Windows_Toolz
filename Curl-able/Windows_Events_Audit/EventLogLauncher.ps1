@@ -30,8 +30,11 @@ do {
 [ 1 ]  Gather all available Windows Event Logs and Parse them
 [ 2 ]  Parse, Merge and De-dupe gathered logs
 [ 3 ]  Audit Event Log Baseline Settings and Remediate
-[ 4 ]  DANGER: Clear all Windows Event Logs and re-apply baseline settings
+[ 4 ]  DANGER: Clear all Windows Event Logs and re-apply Baseline Settings
 [ X ]  Exit
+
+Once you exit the manager script, you can simply type 'ls' to see the scripts available, or
+type '.\EventLogLauncher.ps1' to re-launch the Event Log Manager.
 
 Select an option (1-4 or X to quit):
 "@
