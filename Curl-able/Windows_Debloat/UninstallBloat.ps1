@@ -27,6 +27,7 @@ $AppxBloatList = @(
     "*Asphalt*"
     "*ASUSPCAssistant*"
     "*AutodeskSketchBook*"
+    "*Bing*"
     "*BingNews*"
     "*BingSports*"
     "*BingTranslator*"
