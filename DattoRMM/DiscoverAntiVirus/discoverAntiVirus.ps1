@@ -3,7 +3,7 @@
 # Created by Alex Ivantsov @Exploitacious
 
 # Script Name and Type
-$ScriptName = "Check if Manufacturer is Lenovo" # Quick and easy name of Script to help identify
+$ScriptName = "Check for Primary AV or EDR" # Quick and easy name of Script to help identify
 $ScriptType = "Monitoring" # Monitoring // Remediation
 $Date = get-date -Format "MM/dd/yyy hh:mm tt"
 
@@ -12,10 +12,10 @@ $Global:AlertHealthy = " | Last Checked $Date" # Define what should be displayed
 # There is also another palce to put NO ALERT Healthy messages down below, to try and capture more script info.
 
 ## Verify/Elevate to Admin Session. Comment out if not needed the single line below.
-# if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
 ## Datto RMM Variables ## Uncomment only for testing. Otherwise, use Datto Variables. See Explanation Below.
-#$env:usrUDF = 14 # Which UDF to write to. Leave blank to Skip UDF writing.
+$env:usrUDF = 12 # Which UDF to write to. Leave blank to Skip UDF writing.
 #$env:usrString = Example # Datto User Input variable "usrString"
 
 <#
@@ -57,7 +57,66 @@ $Global:DiagMsg += "Executed On: " + $Date
 
 
 
-### Script Goes Here ###
+
+function Get-ProtectionSummary {
+
+    # --- pull data ----------------------------------------------------------
+    $av = Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct |
+    Select-Object @{n = 'Name'; e = { $_.displayName } },
+    @{n = 'StateHex'; e = { ('{0:X6}' -f $_.productState) } }
+
+    $senseSvc = Get-Service -Name Sense -ErrorAction SilentlyContinue
+    $mdeOn = $false
+    
+    if ($senseSvc -and $senseSvc.Status -eq 'Running') { $mdeOn = $true }
+    else {
+        $key = 'HKLM:\SOFTWARE\Microsoft\Sense'
+        if (Test-Path $key) {
+            $state = (Get-ItemProperty $key -Name OnboardingState -ErrorAction SilentlyContinue).OnboardingState
+            if ($state -eq 3) { $mdeOn = $true }
+        }
+    }
+
+    $primary = $av | Select-Object -First 1
+    switch ($true) {
+        { $mdeOn } { $level = 'Microsoft Defender for Endpoint (full MDE)' ; break }
+        { $primary.Name -like '*Defender*' } { $level = 'Default Windows Defender (non MDE)'            ; break }
+        default { $level = "Third-party AV - $($primary.Name)" }
+    }
+
+    # --- build result object -----------------------------------------------
+    $summary = [PSCustomObject]@{
+        Level            = $level
+        SenseService     = $senseSvc.Status        # Null if service absent
+        SenseOnboarding  = $(if ($mdeOn) { 'Onboarded' } else { 'No' })
+        SecurityCenterAV = ($av | ForEach-Object { "$($_.Name) [0x$($_.StateHex)]" }) -join '; '
+    }
+
+    # --- splat object properties into variables in the *caller’s* scope ----
+    foreach ($prop in $summary.PSObject.Properties) {
+        Set-Variable -Name $prop.Name -Value $prop.Value -Scope 1   # 1 = parent scope
+    }
+}
+
+# --- Launch it ---------------------------------------------------------------
+Get-ProtectionSummary   # emits the table and seeds the variables to be used...
+
+# --- Report to RMM ---
+
+Write-Host
+
+$Global:DiagMsg += "Windows AV 'Sense' Security Service: $SenseService"
+$Global:DiagMsg += "Security Center AV Found: $SecurityCenterAV"
+$Global:DiagMsg += "Microsoft Defender for Endpoint 'Sense' Tenant: $SenseOnboarding"
+
+if ($level -eq 'Microsoft Defender for Endpoint (full MDE)') {
+    $Global:DiagMsg += "Results Found: Found active MDE with Sense fully onboarded."
+    $Global:varUDFString += "$Level | Last Checked $Date"
+}
+else {
+    $Global:AlertMsg = "Results Found: $Level"
+    $Global:varUDFString += "$Level | Last Checked $Date"
+}
 
 
 
@@ -68,7 +127,7 @@ $Global:DiagMsg += "Executed On: " + $Date
 if ($env:usrUDF -ge 1) {    
     if ($Global:varUDFString.length -gt 255) {
         # Write UDF to diaglog
-        $Global:DiagMsg += " - Writing to UDF $env:usrUDF : " + $Global:varUDFString 
+        $Global:DiagMsg += " - Writing to UDF $env:usrUDF :" + $Global:varUDFString 
         # Limit UDF Entry to 255 Characters 
         Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString.substring(0, 255)) -Force
     }
@@ -94,7 +153,7 @@ else {
     $Global:DiagMsg += "Leaving Script with Exit Code 0 (No Alert)"
 
     ##### You may alter the NO ALERT Exit Message #####
-    write-DRMMAlert "No Alert Message Here $Global:AlertHealthy"
+    write-DRMMAlert "Fully Onboarded MDE Found $Global:AlertHealthy"
     write-DRMMDiag $Global:DiagMsg
 
     # Exit 0 means all is well. No Alert.
