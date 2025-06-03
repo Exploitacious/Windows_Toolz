@@ -59,95 +59,169 @@ $Global:DiagMsg += "Executed On: " + $Date
 # ─────────────────── Bitdefender Check ────────────────────────────────────
 function Get-BitdefenderStatus {
 
-    # Try WMI first (works on Windows 10/11/Server with Desktop Experience)
-    $bdAV = $null
-    try {
-        $bdAV = Get-CimInstance -Namespace root/SecurityCenter2 -Class AntiVirusProduct -ErrorAction Stop |
-        Where-Object displayName -like '*Bitdefender*'
-    }
-    catch { }   # namespace missing on Server Core and older Server builds
-
-    # Fallback to service-based detection (works everywhere)
-    $svcNames = 'vsserv', 'bdservicehost', 'bdagent', 'EPIntegrationService'
-    $bdSvc = Get-Service -Name $svcNames -ErrorAction SilentlyContinue | Sort-Object -Unique
-
-    if (-not $bdAV -and -not $bdSvc) { return }        # Bitdefender not found
-
-    # Locate product.console.exe or bduitool.exe (for module check)
-    $roots = @(
-        'C:\Program Files\Bitdefender\Endpoint Security',
-        'C:\Program Files\Bitdefender',
-        'C:\Program Files (x86)\Bitdefender'
-    )
+    # 1)  Find the CLI -------------------------------------------------------
     $console = $null
-    foreach ($r in $roots) {
-        if (Test-Path "$r\product.console.exe") { $console = "$r\product.console.exe"; break }
-        if (Test-Path "$r\bduitool.exe") { $console = "$r\bduitool.exe"; break }
-    }
-
-    $mods = [ordered]@{ Antimalware = 'Unknown'; Firewall = 'Unknown'; NetworkMonitor = 'Unknown' }
-    $rawLines = @()
-    if ($console) {
-        $rawLines = & $console /c 'get ps' 2>&1
-        foreach ($ln in $rawLines) {
-            if ($ln -match '-\s+(\w+)\s+status:\s+(\w+)') {
-                $mods[$matches[1]] = $matches[2]
-            }
+    try {
+        $console = (Get-ChildItem 'C:\Program Files', 'C:\Program Files (x86)' -Filter product.console.exe `
+                -Recurse -ErrorAction SilentlyContinue -Force | Select-Object -First 1).FullName
+        if (-not $console) {
+            $console = (Get-ChildItem 'C:\Program Files', 'C:\Program Files (x86)' -Filter bduitool.exe `
+                    -Recurse -ErrorAction SilentlyContinue -Force | Select-Object -First 1).FullName
         }
     }
+    catch { }
 
-    $allOK = ($mods.Values -notcontains 'Off')
+    if (-not $console) { return }   # no Bitdefender at all → let wrapper fall back to Defender
 
-    # Return summary AND seed parent-scope variables
-    $o = [PSCustomObject]@{
-        BD_Detected       = $true
-        BD_Antimalware    = $mods['Antimalware']
-        BD_Firewall       = $mods['Firewall']
-        BD_NetworkMonitor = $mods['NetworkMonitor']
-        BD_ModulesOK      = $allOK
-        BD_RawOutput      = ($rawLines -join "`n")
+    # 2)  Modules we want to query ------------------------------------------
+    $modules = @{
+        Firewall           = 'Firewall'
+        Antimalware        = 'AntimalwareOnAccess'
+        NetworkProtection  = 'NetworkProtection'
+        AdvancedThreatCtrl = 'AdvancedThreatControl'
+        HyperDetect        = 'HyperDetect'
+        DeviceControl      = 'DeviceControl'
     }
 
-    foreach ($p in $o.PSObject.Properties) {
-        Set-Variable -Name $p.Name -Value $p.Value -Scope 1
-    }
-    return $o
-}
+    # 3)  Ask each one -------------------------------------------------------
+    $results = @{}
+    foreach ($m in $modules.GetEnumerator()) {
 
-# ─────────────────── Defender / MDE Check ─────────────────────
-function Get-ProtectionSummary {
+        $cmdArgs = @('/c', $m.Value, 'get', 'config')
+        $out = @()
+        $exit = 0
 
-    $av = Get-CimInstance -Namespace root/SecurityCenter2 -Class AntiVirusProduct |
-    Select-Object @{n = 'Name'; e = { $_.displayName } },
-    @{n = 'StateHex'; e = { ('{0:X6}' -f $_.productState) } }
-
-    $senseSvc = Get-Service -Name Sense -ErrorAction SilentlyContinue
-    $mdeOn = $false
-    if ($senseSvc -and $senseSvc.Status -eq 'Running') { $mdeOn = $true }
-    else {
-        $key = 'HKLM:\SOFTWARE\Microsoft\Sense'
-        if (Test-Path $key) {
-            $state = (Get-ItemProperty $key -Name OnboardingState -ErrorAction SilentlyContinue).OnboardingState
-            if ($state -eq 3) { $mdeOn = $true }
+        try {
+            $out = & $console @cmdArgs 2>&1
+            $exit = $LASTEXITCODE
         }
+        catch {
+            $out = $_.Exception.Message
+            $exit = 1
+        }
+
+        $joined = ($out -join ' ')
+        $status = if ($exit -ne 0 -or $joined -match '(?i)error|failed|terminat') {
+            'Error'
+        }
+        elseif ($joined -match '(?i)\benabled\b') {
+            'Enabled'
+        }
+        elseif ($joined -match '(?i)\bdisabled\b|\boff\b|\binactive\b') {
+            'Disabled'
+        }
+        else {
+            'Unknown'
+        }
+
+        # shorten the key for nicer variable names
+        $key = switch ($m.Key) { 'AntimalwareOnAccess' { 'Antimalware' } Default { $m.Key } }
+        $results[$key] = $status
     }
 
-    $primary = $av | Select-Object -First 1
-    switch ($true) {
-        { $mdeOn } { $level = 'Microsoft Defender for Endpoint (full MDE)' ; break }
-        { $primary.Name -like '*Defender*' } { $level = 'Default Windows Defender (non-MDE)'         ; break }
-        default { $level = "Third-party AV - $($primary.Name)" }
+    # 4)  Decide overall health (only these must be ON) ----------------------
+    $critical = @('Antimalware', 'Firewall', 'NetworkProtection')
+    $modulesOK = $true
+    foreach ($c in $critical) {
+        if ($results[$c] -ne 'Enabled') { $modulesOK = $false; break }
     }
 
+    # 5)  Build + export summary --------------------------------------------
     $summary = [PSCustomObject]@{
-        Level            = $level
-        SenseService     = $senseSvc.Status
-        SenseOnboarding  = $(if ($mdeOn) { 'Onboarded' } else { 'No' })
-        SecurityCenterAV = ($av | ForEach-Object { "$($_.Name) [0x$($_.StateHex)]" }) -join '; '
+        BD_Antimalware       = $results['Antimalware']
+        BD_Firewall          = $results['Firewall']
+        BD_NetworkProtection = $results['NetworkProtection']
+        BD_ATC               = $results['AdvancedThreatCtrl']
+        BD_HyperDetect       = $results['HyperDetect']
+        BD_DeviceControl     = $results['DeviceControl']
+        BD_ModulesOK         = $modulesOK
+        BD_RawOutput         = ($results.GetEnumerator() |
+            Sort-Object Name |
+            ForEach-Object { "$($_.Name)=$($_.Value)" }) -join '; '
     }
 
     foreach ($p in $summary.PSObject.Properties) {
-        Set-Variable -Name $p.Name -Value $p.Value -Scope 1
+        Set-Variable -Name $p.Name -Value $p.Value -Scope 1   # visible to the wrapper
+    }
+    return $summary
+}
+
+# ─────────────────── Windows Defender / MDE Check ─────────────────────
+function Get-ProtectionSummary {
+
+    # helper: return the first non-null OnboardingState it can read
+    function Get-MDEOnboardingState {
+        $regPaths = @(
+            'HKLM:\SOFTWARE\Microsoft\Windows Advanced Threat Protection\Status', # modern
+            'HKLM:\SOFTWARE\Microsoft\Sense'                                        # legacy fallback
+        )
+        foreach ($p in $regPaths) {
+            try {
+                if (Test-Path $p) {
+                    $v = (Get-ItemProperty -Path $p -Name OnboardingState -ErrorAction Stop).OnboardingState
+                    if ($null -ne $v) { return [int]$v }
+                }
+            }
+            catch { }
+        }
+        return $null
+    }
+
+    # ---------- grab SecurityCenter AV list (ignore if namespace absent) ----------
+    $av = @()
+    try {
+        $av = Get-CimInstance -Namespace root/SecurityCenter2 -Class AntiVirusProduct `
+            -ErrorAction Stop |
+        Select-Object @{n = 'Name'; e = { $_.displayName } },
+        @{n = 'StateHex'; e = { ('{0:X6}' -f $_.productState) } }
+    }
+    catch [Microsoft.Management.Infrastructure.CimException] {
+        if ($_.HResult -eq 0x8004100e) { Write-Verbose 'SecurityCenter2 namespace missing.' }
+    }
+
+    # ---------- Sense / MDE detection ----------
+    $senseSvc = Get-Service -Name Sense -ErrorAction SilentlyContinue
+    $obState = Get-MDEOnboardingState        # null if key not present
+    $mdeOn = ($senseSvc -and $senseSvc.Status -eq 'Running' -and ($obState -in 1, 2))
+
+    # ---------- decide the protection level ----------
+    if ($mdeOn) {
+        $Level = 'Microsoft Defender for Endpoint (full MDE)'
+    }
+    elseif ($av.Count) {
+        $primary = $av[0]
+        if ($primary.Name -like '*Defender*') {
+            $Level = 'Default Windows Defender (non-MDE)'
+        }
+        else {
+            $Level = "Third-party AV - $($primary.Name)"
+        }
+    }
+    else {
+        # last-ditch service probe
+        $wd = Get-Service -Name WinDefend -ErrorAction SilentlyContinue
+        $Level = if ($wd -and $wd.Status -eq 'Running') {
+            'Windows Defender service-level detection'
+        }
+        else {
+            '❌ No Antivirus detected'
+        }
+    }
+
+    # ---------- surface summary ----------
+    $summary = [PSCustomObject]@{
+        Level            = $Level
+        SenseService     = if ($senseSvc) { $senseSvc.Status } else { 'NotFound' }
+        SenseOnboarding  = switch ($obState) { 1 { 'Onboarded' } 2 { 'Pending' } default { 'No' } }
+        SecurityCenterAV = if ($av) {
+                               ($av | ForEach-Object { "$($_.Name) [0x$($_.StateHex)]" }) -join '; '
+        }
+        else { 'None' }
+    }
+
+    # export to caller's scope for RMM variables
+    $summary.PSObject.Properties | ForEach-Object {
+        Set-Variable -Name $_.Name -Value $_.Value -Scope 1
     }
     return $summary
 }
@@ -159,30 +233,41 @@ function Run-AVHealthCheck {
     # Try Bitdefender first
     $bd = Get-BitdefenderStatus
     if ($bd) {
-        $Global:DiagMsg += "Bitdefender detected."
+        $Global:DiagMsg += "Bitdefender detected..."
+        $Global:DiagMsg += "BD_Antimalware Module: $BD_Antimalware"
+        $Global:DiagMsg += "BD_Firewall Module: $BD_Firewall"
+        $Global:DiagMsg += "BD_Network Protection Module: $BD_NetworkProtection"
+        $Global:DiagMsg += "BD_Advanced Threat Control Module: $BD_ATC"
+        $Global:DiagMsg += "BD_Hyper Detect Module: $BD_HyperDetect"
+        $Global:DiagMsg += "BD_Device Control Module: $BD_DeviceControl"
 
         if (-not $BD_ModulesOK) {
-            $Global:AlertMsg = "Bitdefender module(s) disabled - AV:$BD_Antimalware FW:$BD_Firewall NetMon:$BD_NetworkMonitor"
+            $Global:DiagMsg += "Discovered Bitdefender installed but critical security services are not enabled."
+            $Global:AlertMsg = "1 or more Bitdefender modules disabled. Scrutinize diagnostic log | Last Checked $date"
+            $Global:varUDFString = "BD SECURITY SERVICES DISABLED | Last Checked $date"
+            return      # stop here – no need to check Defender/MDE
         }
-
-        $Global:varUDFString += "Bitdefender | Last Checked $date"
-        return      # stop here – no need to check Defender/MDE
+        else {
+            $Global:varUDFString = "Bitdefender OK | Last Checked $date"
+            return      # stop here – no need to check Defender/MDE
+        }
     }
 
     # No BD – fall back to Defender / MDE
     $def = Get-ProtectionSummary
-    $Global:DiagMsg += "Security Center AV Reported: $SecurityCenterAV"
-    $Global:DiagMsg += "Windows AV 'Sense' Service: $SenseService"
-    $Global:DiagMsg += "MDE Onboarding State: $SenseOnboarding"
 
-    if ($Level -eq 'Microsoft Defender for Endpoint (full MDE)') {
-        $Global:DiagMsg += "Results: Active MDE with Tenant Configured 'Sense' fully onboarded."
+    $Global:DiagMsg += "Security Center AV: $($def.SecurityCenterAV)"
+    $Global:DiagMsg += "Sense Service: $($def.SenseService)"
+    $Global:DiagMsg += "MDE Onboarding: $($def.SenseOnboarding)"
+    
+    if ($def.Level -eq 'Microsoft Defender for Endpoint (full MDE)') {
+        $Global:DiagMsg += "Results: Active MDE fully onboarded."
     }
     else {
-        $Global:AlertMsg = "ALERT: Insufficient AV/EDR - $Level"
+        $Global:AlertMsg = "ALERT: Insufficient AV/EDR - $($def.Level)"
     }
-
-    $Global:varUDFString += "$Level | Last Checked $date"
+    
+    $Global:varUDFString += "$($def.Level) | Last Checked $date"
 }
 
 # ── run it ───────────────────────────────────────────────────────────────────
