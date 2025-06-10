@@ -46,6 +46,34 @@ $Global:DiagMsg += "Executed On: " + $Date
 ##################################
 ######## Start of Script #########
 
+# --- Housekeeping: Clean up orphaned scheduled tasks from previous runs ---
+$Global:DiagMsg += "Performing cleanup of any orphaned Datto RMM reboot tasks."
+try {
+    # Clean up UI tasks
+    $orphanedUiTasks = Get-ScheduledTask -TaskName "DattoRMM_UINotification_*" -ErrorAction SilentlyContinue
+    if ($orphanedUiTasks) {
+        $orphanedUiTasks | Unregister-ScheduledTask -Confirm:$false
+        $Global:DiagMsg += "Found and removed $($orphanedUiTasks.Count) orphaned UI task(s): $($orphanedUiTasks.TaskName -join ', ')"
+    }
+    else {
+        $Global:DiagMsg += "No orphaned UI tasks found."
+    }
+
+    # Clean up Reboot tasks
+    $orphanedRebootTasks = Get-ScheduledTask -TaskName "DattoRMM_ForcedReboot_*" -ErrorAction SilentlyContinue
+    if ($orphanedRebootTasks) {
+        $orphanedRebootTasks | Unregister-ScheduledTask -Confirm:$false
+        $Global:DiagMsg += "Found and removed $($orphanedRebootTasks.Count) orphaned reboot task(s): $($orphanedRebootTasks.TaskName -join ', ')"
+    }
+    else {
+        $Global:DiagMsg += "No orphaned reboot tasks found."
+    }
+}
+catch {
+    $Global:DiagMsg += "An unexpected error occurred during the cleanup phase: $($_.Exception.Message)"
+}
+
+
 # --- Set User-configurable variables from Datto RMM with defaults ---
 [int]$RebootDelayMinutes = if ($env:RebootDelayMinutes) { $env:RebootDelayMinutes } else { 15 }
 [string]$CompanyName = if ($env:CompanyName) { $env:CompanyName } else { "Your IT Department" }
@@ -55,15 +83,10 @@ $Global:DiagMsg += "Configuration: Reboot Delay ($($RebootDelayMinutes)min), Com
 
 # --- Logic to find the currently active user session ---
 try {
-    # Query all terminal sessions, find the one that is "Active" and take the first result
     $ActiveSession = query user | Where-Object { $_ -match 'Active' } | Select-Object -First 1
-    
     if ($ActiveSession) {
-        # FIXED: This new parsing logic is simple and robust.
-        # It takes the first block of text (which is '>username' or 'username') and removes the leading '>' if it exists.
         $userColumn = ($ActiveSession.Trim() -split '\s+')[0]
         $LoggedInUser = $userColumn.TrimStart('>')
-        
         $Global:DiagMsg += "Active user found: $LoggedInUser. Proceeding with user notification."
     }
     else {
@@ -74,12 +97,10 @@ catch {
     $Global:DiagMsg += "Could not determine active user. Error: $($_.Exception.Message)"
 }
 
-
 # --- If no user is logged in, just reboot immediately and exit ---
 if (-not $LoggedInUser) {
     $Global:DiagMsg += "No active user is logged on. Rebooting computer immediately."
     Restart-Computer -Force
-    # This part of the script will not be reached, but is included for clarity
     write-DRMMDiag $Global:DiagMsg
     Exit 0
 }
@@ -98,41 +119,44 @@ try {
 }
 catch {
     $Global:DiagMsg += "FATAL: Failed to register reboot task. Error: $($_.Exception.Message)"
-    # Exit here since the primary goal failed
     write-DRMMDiag $Global:DiagMsg
     Exit 1
 }
 
+# --- Define UI task name and temporary script path ---
+$uiTaskName = "DattoRMM_UINotification_$(genRandString 8)"
+$tempScriptPath = "$env:TEMP\$($uiTaskName).ps1"
 
-# --- Create and launch the UI notification in the user's session ---
+# --- Create the self-cleaning UI notification script ---
 $Global:DiagMsg += "Creating UI notification script to run as user '$LoggedInUser'."
 $uiScriptContent = @"
-# This is a temporary script launched by Datto RMM to display a reboot notification.
-`$ErrorActionPreference = 'SilentlyContinue'
-Add-Type -AssemblyName PresentationFramework
-function Get-SystemUptime {
-    `$osInfo = Get-WmiObject -Class Win32_OperatingSystem
-    `$lastBootTime = `$osInfo.ConvertToDateTime(`$osInfo.LastBootUpTime)
-    return (Get-Date) - `$lastBootTime
+# This is a temporary, self-cleaning script launched by Datto RMM.
+param (
+    [string]`$TaskName
+)
+try {
+    `$ErrorActionPreference = 'SilentlyContinue'
+    Add-Type -AssemblyName PresentationFramework
+    function Get-SystemUptime {
+        `$osInfo = Get-WmiObject -Class Win32_OperatingSystem
+        `$lastBootTime = `$osInfo.ConvertToDateTime(`$osInfo.LastBootUpTime)
+        return (Get-Date) - `$lastBootTime
     }
     `$username = "`$env:USERNAME"
     `$uptime = Get-SystemUptime
     `$uptimeFormatted = "{0} days, {1} hours, and {2} minutes" -f `$uptime.Days, `$uptime.Hours, `$uptime.Minutes
-    `$message = @"
-    Hello `$username,
-    
-    This is a message from your system administrators at '$($CompanyName)'.
-    
-    Your computer has been running for `$uptimeFormatted.
-    To ensure optimal performance and apply important updates, a reboot is now required.
-    
-    This system WILL AUTOMATICALLY REBOOT in $($RebootDelayMinutes) minutes.
-    
-    Please save all your work and close any open applications now.
-    You can click the button below to restart immediately, otherwise this window can be closed.
-    
-    Thank you for your cooperation!
-    "@
+    `$message = @'
+Hello, this is a message from Umbrella IT Solutions.
+
+Your computer has been running for quite some time and to ensure
+optimal performance and apply important updates, a reboot is required.
+
+Please save all your work and close any open applications now.
+You can click the button below to restart immediately, or
+This system WILL AUTOMATICALLY REBOOT in 15 minutes.
+
+Thank you for your cooperation!
+'@
     `$window = New-Object System.Windows.Window
     `$window.Title = '$($WindowTitle)'
     `$window.Width = 450
@@ -158,32 +182,30 @@ function Get-SystemUptime {
     `$dockPanel.Children.Add(`$button)
     `$window.Content = `$dockPanel
     [void]`$window.ShowDialog()
+}
+finally {
+    if (-not [string]::IsNullOrEmpty(`$TaskName)) {
+        Unregister-ScheduledTask -TaskName `$TaskName -Confirm:`$false
+    }
+    Remove-Item -Path `$MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
+}
 "@
-
-$tempScriptPath = "$env:TEMP\datto_ui_notify.ps1"
 $uiScriptContent | Out-File -FilePath $tempScriptPath -Encoding utf8 -Force
 
 # --- Schedule the UI script to run immediately as the logged-in user ---
-# NOTE: This requires the target user ($LoggedInUser) to have "Log on as a batch job" rights.
-# Administrator accounts have this by default. If targeting standard users, this step may fail.
 $Global:DiagMsg += "Attempting to register and run UI task as user: $LoggedInUser"
-$uiTaskName = "DattoRMM_UINotification_$(genRandString 8)"
-$uiAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-ExecutionPolicy Bypass -File `"$tempScriptPath`""
+$uiAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$tempScriptPath`" -TaskName `"$uiTaskName`""
 $uiPrincipal = New-ScheduledTaskPrincipal -UserId $LoggedInUser -LogonType Interactive
 
 try {
     Register-ScheduledTask -TaskName $uiTaskName -Action $uiAction -Principal $uiPrincipal -Description "Datto RMM UI component." -Force
     Start-ScheduledTask -TaskName $uiTaskName
-    $Global:DiagMsg += "Successfully launched UI task '$uiTaskName'."
-    Start-Sleep -s 2
-    Unregister-ScheduledTask -TaskName $uiTaskName -Confirm:$false
-    $Global:DiagMsg += "Cleaned up UI task '$uiTaskName'."
+    $Global:DiagMsg += "Successfully launched self-cleaning UI task '$uiTaskName'."
+
 }
 catch {
-    # FIXED: Corrected the variable escaping to ensure the actual error message is logged.
     $Global:DiagMsg += "ERROR: Failed to register or run UI notification task. This can happen if the user lacks 'Log on as a batch job' permissions. Error: $($_.Exception.Message)"
 }
-
 
 ######## End of Script ###########
 ##################################
@@ -211,7 +233,6 @@ if ($null -ne $env:APIEndpoint) {
     $Global:DiagMsg += " - Sending Results to API"
     Invoke-WebRequest -Uri $env:APIEndpoint -Method POST -Body ($APIinfoHashTable | ConvertTo-Json) -ContentType "application/json"
 }
-# Exit with writing diagnostic back to the ticket / remediation component log
 $Global:DiagMsg += "Main script finished. Reboot and UI tasks are now managed by Windows Task Scheduler."
 write-DRMMDiag $Global:DiagMsg
 Exit 0
