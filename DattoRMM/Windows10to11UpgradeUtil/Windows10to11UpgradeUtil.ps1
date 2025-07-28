@@ -1,9 +1,9 @@
-# 
+#
 ## Template for Remediation Components for Datto RMM with PowerShell
 # Created by Alex Ivantsov @Exploitacious
 
 # Script Name and Type
-$ScriptName = "In-Place Upgrade W10 to W11 (Asynchronous Launch)" # Quick and easy name of Script to help identify
+$ScriptName = "In-Place Upgrade to Windows 11" # Quick and easy name of Script to help identify
 $ScriptType = "Remediation" # Monitoring // Remediation
 
 ## Verify/Elevate to Admin Session. Comment out if not needed the single line below.
@@ -12,7 +12,7 @@ if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 ## Datto RMM Variables ## Uncomment only for testing. Otherwise, use Datto Variables. See Explanation Below.
 #$env:APIEndpoint = "https://prod-36.westus.logic.azure.com:443/workflows/6c032a1ca84045b9a7a1436864ecf696/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=c-dVa333HMzhWli_Fp_4IIAqaJOMwFjP2y5Zfv4j_zA"
 #$env:usrUDF = 14 # Which UDF to write to. Leave blank to Skip UDF writing.
-#$env:usrString = Example # Datto User Input variable "usrString"
+#$env:usrOverrideChecks = $false # Datto User Input variable "usrOverrideChecks"
 
 <#
 This Script is a Remediation compoenent, meaning it performs only one task with a log of granular detail. These task results can be added back ito tickets as time entries using the API. 
@@ -26,7 +26,7 @@ Below you will find all the standard variables to use with Datto RMM to interrac
 #># DattoRMM Alert Functions. Don't touch these unless you know what you're doing.
 function write-DRMMDiag ($messages) {
     Write-Host  '<-Start Diagnostic->'
-    foreach ($Message in $Messages) { $Message + ' `' }
+    foreach ($Message in $messages) { $Message + ' `' }
     Write-Host '<-End Diagnostic->'
 }
 function genRandString ([int]$length, [string]$chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') {
@@ -45,233 +45,366 @@ $Global:DiagMsg += "Executed On: " + $Date
 ##################################
 ######## Start of Script #########
 
-#<#
-#.SYNOPSIS
-#    A PowerShell script to prepare a Windows 10 system for and initiate an in-place upgrade to Windows 11.
-#    This script is designed to be resilient and run via RMM tools (as SYSTEM), requiring no user interaction.
-#
-#.NOTES
-#    Author: Alex Ivantsov
-#    Date:   June 27, 2025
-#    Version: 1.3 - Changed to fire-and-forget model; script exits after launching the upgrade assistant.
-#
-#    DISCLAIMER: This script performs significant system modifications. It is highly recommended to test this script
-#    in a controlled lab environment before deploying to production systems. The author is not responsible for any
-#    data loss or system instability.
-##>
 
-#--------------------------------------------------------------------------------
-# --- User-Modifiable Variables ---
-#--------------------------------------------------------------------------------
 
-# The URL for the official Microsoft Windows 11 Installation Assistant.
-$Win11DownloadUrl = "https://go.microsoft.com/fwlink/?linkid=2171764"
+<#
+.SYNOPSIS
+    A script to automate the in-place upgrade of a Windows 10 device to the latest version of Windows 11.
 
-# A robust temporary location for the installer. The script will create C:\Temp if it doesn't exist.
-$InstallerTempDir = "C:\Temp\RMM_Upgrade_Temp"
-$InstallerTempPath = Join-Path -Path $InstallerTempDir -ChildPath "Windows11InstallationAssistant.exe"
+.DESCRIPTION
+    This script modifies the system power plan to prevent sleep/hibernation, performs pre-flight checks,
+    clears upgrade blockers, and starts the Windows 11 upgrade. It creates a RunOnce task to restore
+    the original power settings after the first reboot.
+    
+.AUTHOR
+    Alex Ivantsov
 
-# Minimum system requirements for the prerequisite checks.
-$MinimumRamGB = 4
-$MinimumStorageGB = 64
-$MinimumCpuCores = 2
-$MinimumCpuSpeedGHz = 1.0
+.DATE
+    July 18, 2025
+#>
 
-#--------------------------------------------------------------------------------
-# --- Function Definitions ---
-#--------------------------------------------------------------------------------
+# =================================================================================================
+#                                       USER-CONFIGURABLE VARIABLES
+# =================================================================================================
 
-Function Remove-UpgradeBlockers {
+# Set this to $true in the Datto RMM Component variables to allow the script to continue even if a blocking error is encountered.
+# WARNING: Overriding checks is not recommended and can lead to unpredictable results.
+if (-not ($env:usrOverrideChecks)) {
+    [boolean]$env:usrOverrideChecks = $false
+}
+
+
+# =================================================================================================
+#                                       FUNCTION DEFINITIONS
+# =================================================================================================
+
+Function Handle-BlockingError {
+    <#
+    .SYNOPSIS
+        Handles blocking errors by either exiting the script or allowing it to continue if the override flag is set.
+    #>
+    param (
+        [string]$ErrorMessage
+    )
+
+    Write-Host "`n! ERROR: $ErrorMessage" -ForegroundColor Red
+
+    if ([System.Convert]::ToBoolean($env:usrOverrideChecks)) {
+        Write-Host "! A blocking error was encountered, but the 'usrOverrideChecks' flag is enabled." -ForegroundColor Yellow
+        Write-Host "  The script will proceed. Support cannot assist with issues arising from this override." -ForegroundColor Yellow
+    }
+    else {
+        Write-Host "! This is a blocking error, and the operation has been aborted." -ForegroundColor Red
+        Write-Host "  To ignore this error, set the `$usrOverrideChecks` variable to `$true` and re-run the script."
+        Write-Host "  Stopping any existing setup processes..."
+        
+        Stop-Process -Name 'setupHost', 'mediaTool', 'Windows10UpgraderApp', 'installAssistant' -ErrorAction SilentlyContinue -Force
+        
+        # Stop script and report failure back to Datto RMM
+        $Global:DiagMsg += "! SCRIPT FAILED: $ErrorMessage"
+        write-DRMMDiag $Global:DiagMsg
+        exit 1
+    }
+}
+
+Function Set-PowerPlanForUpgrade {
+    <#
+    .SYNOPSIS
+        Gets current power settings, sets them to 'Never' to prevent sleep/hibernate,
+        and creates a RunOnce scheduled task to revert the settings after reboot.
+    #>
+    $Global:DiagMsg += "`n- Configuring power plan to prevent sleep during upgrade..."
+
+    try {
+        # Function to get current setting value in minutes by parsing powercfg output
+        function Get-PowerSettingMinutes($SettingAlias) {
+            $acValue = (powercfg -q | Select-String "($($SettingAlias))" -Context 0, 2 | Select-String "Current AC" | Out-String -Stream).Trim().Split(' ')[-1]
+            $dcValue = (powercfg -q | Select-String "($($SettingAlias))" -Context 0, 2 | Select-String "Current DC" | Out-String -Stream).Trim().Split(' ')[-1]
+            
+            # Convert hex seconds to decimal minutes
+            $acMinutes = ([System.Convert]::ToInt32($acValue, 16)) / 60
+            $dcMinutes = ([System.Convert]::ToInt32($dcValue, 16)) / 60
+            
+            return @{ AC = $acMinutes; DC = $dcMinutes }
+        }
+
+        # Get original values using their well-known GUID aliases
+        $originalStandby = Get-PowerSettingMinutes -SettingAlias "STANDBYIDLE"
+        $originalHibernate = Get-PowerSettingMinutes -SettingAlias "HIBERNATEIDLE"
+
+        $Global:DiagMsg += "  Original Standby Timeout (Minutes) - AC: $($originalStandby.AC), DC: $($originalStandby.DC)"
+        $Global:DiagMsg += "  Original Hibernate Timeout (Minutes) - AC: $($originalHibernate.AC), DC: $($originalHibernate.DC)"
+        
+        # Set new values to Never (0 minutes)
+        $Global:DiagMsg += "  Setting Standby and Hibernate timeouts to 'Never'..."
+        powercfg /change -standby-timeout-ac 0
+        powercfg /change -standby-timeout-dc 0
+        powercfg /change -hibernate-timeout-ac 0
+        powercfg /change -hibernate-timeout-dc 0
+
+        # Create the cleanup script that will be run once after reboot
+        $cleanupScriptPath = "C:\Windows\Temp\ResetPowerPlan.ps1"
+        $cleanupScriptContent = @"
+# This script is run once automatically after reboot to restore original power settings.
+
+Write-Host "Restoring original power settings..."
+powercfg /change -standby-timeout-ac $($originalStandby.AC)
+powercfg /change -standby-timeout-dc $($originalStandby.DC)
+powercfg /change -hibernate-timeout-ac $($originalHibernate.AC)
+powercfg /change -hibernate-timeout-dc $($originalHibernate.DC)
+Write-Host "Power settings restored."
+
+# Self-destruct the script file
+Remove-Item -Path "`$($MyInvocation.MyCommand.Definition)" -Force
+"@
+
+        $cleanupScriptContent | Out-File -FilePath $cleanupScriptPath -Encoding ascii -Force
+        $runOnceCommand = "powershell.exe -ExecutionPolicy Bypass -File `"$cleanupScriptPath`""
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce" -Name "ResetWinUpgradePowerPlan" -Value $runOnceCommand -Force
+        $Global:DiagMsg += "  SUCCESS: Created RunOnce task to restore power settings on next boot."
+    }
+    catch {
+        $Global:DiagMsg += "  ERROR: Failed to configure power settings. The upgrade will continue, but the device may sleep. Error: $($_.Exception.Message)"
+        # This is not a blocking error.
+    }
+}
+
+Function Invoke-DownloadWithRedirect {
+    <#
+    .SYNOPSIS
+        Downloads a file from a URL that may use a shortlink or redirect.
+    #>
+    param (
+        [Parameter(Mandatory = $true)][string]$Url,
+        [Parameter(Mandatory = $true)][string]$DestinationFile,
+        [string]$WhitelistDomain
+    )
+
+    $Global:DiagMsg += "`n- Attempting to download file from '$Url'..."
+
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        
+        $request = [System.Net.HttpWebRequest]::Create($Url)
+        $request.Method = "HEAD"
+        $response = $request.GetResponse()
+        
+        $finalUrl = $response.ResponseURI.AbsoluteURI
+        $response.Close()
+
+        $Global:DiagMsg += "  Redirected to: $finalUrl"
+
+        $webClient = New-Object System.Net.WebClient
+        $webClient.DownloadFile($finalUrl, $DestinationFile)
+
+        if (Test-Path $DestinationFile) {
+            $fileName = Split-Path -Path $DestinationFile -Leaf
+            $Global:DiagMsg += "  SUCCESS: Downloaded '$fileName' successfully."
+        }
+        else {
+            $errorMessage = "File could not be downloaded."
+            if ($WhitelistDomain) { $errorMessage += " Please ensure '$WhitelistDomain' is whitelisted in your firewall." }
+            Handle-BlockingError -ErrorMessage $errorMessage
+        }
+    }
+    catch {
+        $errorMessage = "An error occurred during download: $($_.Exception.Message)"
+        if ($WhitelistDomain) { $errorMessage += " Please ensure '$WhitelistDomain' is whitelisted." }
+        Handle-BlockingError -ErrorMessage $errorMessage
+    }
+}
+
+Function Test-AuthenticodeSignature {
+    <#
+    .SYNOPSIS
+        Verifies the Authenticode digital signature of a file against a known certificate thumbprint.
+    #>
+    param (
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [Parameter(Mandatory = $true)][string]$ExpectedCertSubject,
+        [Parameter(Mandatory = $true)][string]$ExpectedThumbprint,
+        [Parameter(Mandatory = $true)][string]$AppName
+    )
+
+    $Global:DiagMsg += "`n- Verifying digital signature for '$AppName'..."
+
+    if (!(Test-Path -Path $FilePath)) {
+        Handle-BlockingError -ErrorMessage "File '$FilePath' not found for signature verification."
+        return
+    }
+
+    try {
+        $signature = Get-AuthenticodeSignature -FilePath $FilePath
+        
+        $chain = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Chain
+        $chain.Build($signature.SignerCertificate) | Out-Null
+        
+        $intermediateCert = $chain.ChainElements | ForEach-Object { $_.Certificate } | Where-Object { $_.Subject -like "*$ExpectedCertSubject*" }
+        
+        if ($intermediateCert.Thumbprint -eq $ExpectedThumbprint) {
+            $Global:DiagMsg += "  SUCCESS: Digital signature verification passed."
+        }
+        else {
+            $errorMessage = "Digital signature thumbprint mismatch for '$AppName'."
+            $Global:DiagMsg += "  Expected: $ExpectedThumbprint"
+            $Global:DiagMsg += "  Received: $($intermediateCert.Thumbprint)"
+            Handle-BlockingError -ErrorMessage $errorMessage
+        }
+    }
+    catch {
+        $errorMessage = "Failed to validate the certificate for '$AppName'. The file may be corrupt or untrusted. Error: $($_.Exception.Message)"
+        Handle-BlockingError -ErrorMessage $errorMessage
+    }
+}
+
+Function Clear-UpgradeBlockers {
     <#
     .SYNOPSIS
         Removes common software-based blockers that can prevent the Windows 11 upgrade.
     #>
-    $Global:DiagMsg += "INFO: Stage 1 of 3: Removing potential upgrade blockers..."
+    $Global:DiagMsg += "`n- Removing potential software and policy-based upgrade blockers..."
 
-    # --- 1.1: Registry Key Remediation ---
-    $WindowsUpdatePolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate"
-    if (Test-Path -Path $WindowsUpdatePolicyPath) {
-        $Global:DiagMsg += "INFO: Found Windows Update policy key. Checking for release version locks..."
+    # --- 1. Registry Key Remediation ---
+    $windowsUpdatePolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate"
+    if (Test-Path -Path $windowsUpdatePolicyPath) {
+        $Global:DiagMsg += "  [1/3] Found Windows Update policy key. Checking for release version locks..."
         $propertiesToRemove = @("TargetReleaseVersion", "TargetReleaseVersionInfo", "ProductVersion")
         foreach ($property in $propertiesToRemove) {
-            if (Get-ItemProperty -Path $WindowsUpdatePolicyPath -Name $property -ErrorAction SilentlyContinue) {
-                $Global:DiagMsg += "  - Removing registry value '$property'..."
-                try { Remove-ItemProperty -Path $WindowsUpdatePolicyPath -Name $property -Force -ErrorAction Stop }
-                catch { $Global:DiagMsg += "  - WARNING: Could not remove registry value '$property'. This may be due to permissions." }
+            if (Get-ItemProperty -Path $windowsUpdatePolicyPath -Name $property -ErrorAction SilentlyContinue) {
+                $Global:DiagMsg += "    - Removing registry value '$property'..."
+                try { Remove-ItemProperty -Path $windowsUpdatePolicyPath -Name $property -Force -ErrorAction Stop } catch { $Global:DiagMsg += "    - WARN: Could not remove registry value '$property'." }
             }
         }
     }
-    else {
-        $Global:DiagMsg += "INFO: Windows Update policy key not found."
-    }
+    else { $Global:DiagMsg += "  [1/3] Windows Update policy key not found." }
 
-    # --- 1.2: Local Group Policy Reset ---
-    $Global:DiagMsg += "INFO: Resetting local Group Policy objects for Windows Update..."
+    # --- 2. Windows Update Service and Component Reset ---
+    $Global:DiagMsg += "  [2/3] Resetting Windows Update components..."
+    $servicesToReset = @("wuauserv", "bits")
+    $softwareDistPath = Join-Path -Path $env:SystemRoot -ChildPath "SoftwareDistribution"
+    $catroot2Path = Join-Path -Path $env:SystemRoot -ChildPath "System32\catroot2"
+    $servicesToReset | ForEach-Object { $Global:DiagMsg += "    - Stopping service '$_'..."; Stop-Service -Name $_ -Force -ErrorAction SilentlyContinue }
+    try {
+        if (Test-Path $softwareDistPath) { Rename-Item -Path $softwareDistPath -NewName "SoftwareDistribution.old" -Force -ErrorAction Stop }
+        if (Test-Path $catroot2Path) { Rename-Item -Path $catroot2Path -NewName "catroot2.old" -Force -ErrorAction Stop }
+        $Global:DiagMsg += "    - Successfully renamed Windows Update cache folders."
+    }
+    catch { $Global:DiagMsg += "    - WARN: Could not rename Windows Update folders." }
+    $servicesToReset | ForEach-Object { $Global:DiagMsg += "    - Starting service '$_'..."; Start-Service -Name $_ }
+    
+    # --- 3. Local Group Policy Reset ---
+    $Global:DiagMsg += "  [3/3] Resetting local Group Policy objects..."
     try {
         $gpPathSystem = Join-Path -Path $env:SystemRoot -ChildPath "System32\GroupPolicy"
         $gpPathUsers = Join-Path -Path $env:SystemRoot -ChildPath "System32\GroupPolicyUsers"
-        if (Test-Path $gpPathSystem) {
-            $Global:DiagMsg += "  - Removing policy files from '$gpPathSystem'..."
-            Remove-Item -Path "$gpPathSystem\*" -Recurse -Force -ErrorAction Stop
-        }
-        if (Test-Path $gpPathUsers) {
-            $Global:DiagMsg += "  - Removing policy files from '$gpPathUsers'..."
-            Remove-Item -Path "$gpPathUsers\*" -Recurse -Force -ErrorAction Stop
-        }
-        gpupdate /force
-        $Global:DiagMsg += "INFO: Local Group Policy reset and refresh complete."
+        if (Test-Path $gpPathSystem) { Remove-Item -Path "$gpPathSystem\*" -Recurse -Force -ErrorAction Stop }
+        if (Test-Path $gpPathUsers) { Remove-Item -Path "$gpPathUsers\*" -Recurse -Force -ErrorAction Stop }
+        gpupdate /force | Out-Null
+        $Global:DiagMsg += "    - Local Group Policy reset and refresh complete."
     }
-    catch {
-        $Global:DiagMsg += "WARN: Failed to reset local Group Policy. This might not be critical."
-    }
-
-    # --- 1.3: Windows Update Service and Component Reset ---
-    $Global:DiagMsg += "INFO: Resetting Windows Update components..."
-    $services = @("wuauserv", "bits")
-    foreach ($service in $services) {
-        $Global:DiagMsg += "  - Stopping service '$service'..."
-        Stop-Service -Name $service -Force -ErrorAction SilentlyContinue
-    }
-
-    try {
-        $softwareDistPath = Join-Path -Path $env:SystemRoot -ChildPath "SoftwareDistribution"
-        $catroot2Path = Join-Path -Path $env:SystemRoot -ChildPath "System32\catroot2"
-        if (Test-Path $softwareDistPath) {
-            $Global:DiagMsg += "  - Renaming '$softwareDistPath'..."
-            Rename-Item -Path $softwareDistPath -NewName "SoftwareDistribution.old" -Force -ErrorAction Stop
-        }
-        if (Test-Path $catroot2Path) {
-            $Global:DiagMsg += "  - Renaming '$catroot2Path'..."
-            Rename-Item -Path $catroot2Path -NewName "catroot2.old" -Force -ErrorAction Stop
-        }
-        $Global:DiagMsg += "INFO: Windows Update cache folders successfully renamed."
-    }
-    catch {
-        $Global:DiagMsg += "WARN: Could not rename Windows Update folders. They may be in use."
-    }
-
-    foreach ($service in $services) {
-        $Global:DiagMsg += "  - Starting service '$service'..."
-        Start-Service -Name $service
-    }
+    catch { $Global:DiagMsg += "    - WARN: Failed to reset local Group Policy." }
 }
 
-Function Test-SystemPrerequisites {
+Function Start-UpgradeProcess {
     <#
     .SYNOPSIS
-        Checks if the system meets the minimum requirements for Windows 11.
+        Starts the Windows 11 Installation Assistant with silent parameters.
     #>
-    $Global:DiagMsg += "INFO: Stage 2 of 3: Performing pre-flight readiness checks..."
-    $allChecksPassed = $true
-
-    # --- 2.1: TPM Check ---
-    try {
-        $tpm = Get-Tpm -ErrorAction Stop
-        if ($tpm.TpmPresent -and $tpm.TpmReady) { $Global:DiagMsg += "  - PASSED: TPM is present and ready." }
-        else { $Global:DiagMsg += "  - FAILED: TPM not ready. (Present: $($tpm.TpmPresent), Ready: $($tpm.TpmReady))"; $allChecksPassed = $false }
-    }
-    catch { $Global:DiagMsg += "  - FAILED: Could not retrieve TPM status."; $allChecksPassed = $false }
+    param ( [Parameter(Mandatory = $true)][string]$InstallerPath )
     
-    # --- 2.2: Secure Boot Check ---
+    $Global:DiagMsg += "`n- Starting the Windows 11 Installation Assistant..."
+    $Global:DiagMsg += "  This process will run in the background. The script will wait for 2 minutes to confirm it has started."
     try {
-        if ((Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\State" -Name "UEFISecureBootEnabled").UEFISecureBootEnabled -eq 1) { $Global:DiagMsg += "  - PASSED: Secure Boot is enabled." }
-        else { $Global:DiagMsg += "  - FAILED: Secure Boot is disabled."; $allChecksPassed = $false }
+        $arguments = "/quietinstall /skipeula /auto upgrade"
+        Start-Process -FilePath $InstallerPath -ArgumentList $arguments
+        $Global:DiagMsg += "  Installer launched successfully. Waiting to verify activity..."
+        Start-Sleep -Seconds 120
     }
-    catch { $Global:DiagMsg += "  - FAILED: Could not verify Secure Boot status."; $allChecksPassed = $false }
-    
-    # --- 2.3: RAM Check ---
-    $totalRamGB = [math]::Round((Get-CimInstance -ClassName Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 2)
-    if ($totalRamGB -ge $MinimumRamGB) { $Global:DiagMsg += "  - PASSED: System has $totalRamGB GB RAM (Minimum: $MinimumRamGB GB)." }
-    else { $Global:DiagMsg += "  - FAILED: System has $totalRamGB GB RAM (Minimum: $MinimumRamGB GB)."; $allChecksPassed = $false }
-
-    # --- 2.4: Storage Check ---
-    $freeSpaceGB = [math]::Round((Get-PSDrive -Name $env:SystemDrive.Substring(0, 1)).Free / 1GB, 2)
-    if ($freeSpaceGB -ge $MinimumStorageGB) { $Global:DiagMsg += "  - PASSED: System drive has $freeSpaceGB GB free space (Minimum: $MinimumStorageGB GB)." }
-    else { $Global:DiagMsg += "  - FAILED: System drive has $freeSpaceGB GB free space (Minimum: $MinimumStorageGB GB)."; $allChecksPassed = $false }
-
-    # --- 2.5: CPU Check ---
-    $processor = Get-CimInstance -ClassName Win32_Processor
-    $coreCount = $processor.NumberOfCores
-    $cpuSpeed = $processor.MaxClockSpeed / 1000
-    if (($coreCount -ge $MinimumCpuCores) -and ($cpuSpeed -ge $MinimumCpuSpeedGHz)) { $Global:DiagMsg += "  - PASSED: CPU has $coreCount cores @ $cpuSpeed GHz." }
-    else { $Global:DiagMsg += "  - FAILED: CPU does not meet requirements (Cores: $coreCount, Speed: $cpuSpeed GHz)."; $allChecksPassed = $false }
-
-    return $allChecksPassed
+    catch { Handle-BlockingError -ErrorMessage "Failed to start the installer process. Error: $($_.Exception.Message)" }
 }
 
-Function Start-WindowsUpgrade {
+Function Confirm-UpgradeIsRunning {
     <#
     .SYNOPSIS
-        Downloads and executes the Windows 11 Installation Assistant, then exits.
+        Confirms that the upgrade is running by checking for the installer's download files.
     #>
-    $Global:DiagMsg += "INFO: Stage 3 of 3: Initiating Windows 11 upgrade..."
-
-    # --- 3.1: Download Installation Assistant ---
-    try {
-        # Ensure the parent C:\Temp directory exists
-        if (-not (Test-Path -Path "C:\Temp" -PathType Container)) {
-            $Global:DiagMsg += "INFO: C:\Temp not found. Creating it now..."
-            New-Item -Path "C:\" -Name "Temp" -ItemType Directory -Force -ErrorAction Stop
-        }
-        
-        $Global:DiagMsg += "INFO: Preparing temporary directory at '$InstallerTempDir'..."
-        if (-not (Test-Path -Path $InstallerTempDir)) {
-            New-Item -Path $InstallerTempDir -ItemType Directory -Force -ErrorAction Stop
-        }
-        
-        $Global:DiagMsg += "INFO: Downloading Windows 11 Installation Assistant from '$Win11DownloadUrl'..."
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $Win11DownloadUrl -OutFile $InstallerTempPath -ErrorAction Stop
-        $Global:DiagMsg += "INFO: Download complete. Installer saved to '$InstallerTempPath'."
-    }
-    catch {
-        $Global:DiagMsg += "FATAL: Failed to create directory or download the Installation Assistant. Error: $_"
-        return # Exit the function
-    }
-
-    # --- 3.2: Execute Silent Upgrade (Fire and Forget) ---
-    $arguments = "/QuietInstall /SkipEULA /NoRestartUI"
-    $Global:DiagMsg += "INFO: Launching the silent upgrade process with arguments: '$arguments'."
-    try {
-        # Launch the process without -Wait, so the script can continue and exit.
-        Start-Process -FilePath $InstallerTempPath -ArgumentList $arguments -NoNewWindow -ErrorAction Stop
-        
-        # If we get here, the process was launched successfully.
-        $Global:DiagMsg += "SUCCESS: The upgrade assistant has been launched. The script will now exit and the upgrade will continue in the background."
-    }
-    catch {
-        $Global:DiagMsg += "FATAL: An error occurred while trying to launch the Installation Assistant: $_"
-    }
-    finally {
-        # Clean up the downloaded installer and temporary directory.
-        # This is safe because the installer is copied to another location by the OS to run.
-        if (Test-Path -Path $InstallerTempDir) {
-            $Global:DiagMsg += "INFO: Cleaning up temporary directory..."
-            Remove-Item -Path $InstallerTempDir -Recurse -Force -ErrorAction SilentlyContinue
-        }
-    }
+    $Global:DiagMsg += "`n- Confirming installer activity..."
+    $configIniPath = Join-Path -Path ${env:ProgramFiles(x86)} -ChildPath "WindowsInstallationAssistant\Configuration.ini"
+    if (!(Test-Path $configIniPath)) { Handle-BlockingError -ErrorMessage "Installer 'Configuration.ini' not found."; return }
+    $downloadFolderPath = (Select-String -Path $configIniPath -Pattern "DownloadESDFolder").Line.Split('=')[1]
+    if ([string]::IsNullOrWhiteSpace($downloadFolderPath)) { Handle-BlockingError -ErrorMessage "Could not read ESD download folder path."; return }
+    $esdFile = Get-ChildItem -Path "$downloadFolderPath*.esd" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (!$esdFile) { Handle-BlockingError -ErrorMessage "Could not find installer's ESD download file."; return }
+    $tenMinutesAgo = (Get-Date).AddMinutes(-10)
+    if ($esdFile.LastWriteTime -lt $tenMinutesAgo) { Handle-BlockingError -ErrorMessage "Installer download appears to have stalled." }
+    else { $Global:DiagMsg += "  SUCCESS: Active ESD file found. The upgrade process is running." ; $Global:DiagMsg += "  ESD Location: $($esdFile.FullName)" }
 }
 
-#--------------------------------------------------------------------------------
-# --- Main Script Execution ---
-#--------------------------------------------------------------------------------
 
-# Execute Stage 1: Remove Blockers
-Remove-UpgradeBlockers
+# =================================================================================================
+#                                       MAIN SCRIPT EXECUTION
+# =================================================================================================
 
-# Execute Stage 2: Prerequisite Checks
-if (-not (Test-SystemPrerequisites)) {
-    $Global:DiagMsg += "FATAL: System prerequisites not met. Aborting upgrade process."
-}
-else {
-    $Global:DiagMsg += "SUCCESS: All system prerequisites passed."
-    # Execute Stage 3: Start the Upgrade
-    Start-WindowsUpgrade
-}
+$Global:DiagMsg += "==============================================================================="
+$Global:DiagMsg += "  Windows 11 Upgrade Tool"
+$Global:DiagMsg += "==============================================================================="
 
-$Global:DiagMsg += "------------------------------------------------------------------"
-$Global:DiagMsg += "Script execution finished."
-$Global:DiagMsg += "------------------------------------------------------------------"
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+
+# --- Power Plan Configuration ---
+Set-PowerPlanForUpgrade
+
+# --- System Information Gathering ---
+$Global:DiagMsg += "`n- Gathering system information..."
+$winBuild = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion").CurrentBuildNumber
+$osInfo = Get-WmiObject -Class Win32_OperatingSystem
+$processorInfo = Get-WmiObject -Class Win32_Processor
+$tpmInfo = Get-WmiObject -Class Win32_TPM -Namespace "root\CIMV2\Security\MicrosoftTpm" -ErrorAction SilentlyContinue
+$Global:DiagMsg += "  Hostname:          $($env:COMPUTERNAME)"
+$Global:DiagMsg += "  Windows Version:   $($osInfo.Caption) (Build $winBuild)"
+$Global:DiagMsg += "  Architecture:      $($processorInfo.Architecture | ForEach-Object { @{ 9 = '64-bit (x64)'; 0 = '32-bit (x86)' }[$_] })"
+if ([System.Convert]::ToBoolean($env:usrOverrideChecks)) { $Global:DiagMsg += "  Override Mode:     Enabled" }
+
+# --- Pre-Flight Eligibility Checks ---
+$Global:DiagMsg += "`n- Starting device hardware and OS eligibility checks..."
+$supportedSkus = @(4, 27, 48, 49, 98, 99, 100, 101, 161, 162) 
+if ($osInfo.OperatingSystemSKU -in $supportedSkus) { $Global:DiagMsg += "  [PASS] Windows SKU is supported." } else { Handle-BlockingError -ErrorMessage "Windows SKU ($($osInfo.OperatingSystemSKU)) is not supported." }
+if ($processorInfo.Architecture -ne 9) { Handle-BlockingError -ErrorMessage "A 64-bit (x64) processor is required." } else { $Global:DiagMsg += "  [PASS] 64-bit OS and processor detected." }
+if ([int]$winBuild -lt 19041) { Handle-BlockingError -ErrorMessage "Windows 10 Version 2004 (Build 19041) or higher is required." } else { $Global:DiagMsg += "  [PASS] Windows build ($winBuild) meets minimum requirement." }
+$licenseStatus = (Get-WmiObject SoftwareLicensingProduct | Where-Object { $_.PartialProductKey -and $_.Name -like '*Windows(R)*' } | Select-Object -First 1).LicenseStatus
+if ($licenseStatus -ne 1) { Handle-BlockingError -ErrorMessage "Windows is not properly licensed or activated." } else { $Global:DiagMsg += "  [PASS] Windows license is valid and activated." }
+$systemDrive = Get-WmiObject -Class Win32_Volume | Where-Object { $_.DriveLetter -eq $env:SystemDrive }
+$freeSpaceGB = [Math]::Round($systemDrive.FreeSpace / 1GB)
+if ($freeSpaceGB -lt 20) { Handle-BlockingError -ErrorMessage "Insufficient disk space. 20 GB required, $freeSpaceGB GB available." } else { $Global:DiagMsg += "  [PASS] Sufficient disk space available ($freeSpaceGB GB)." }
+$totalRamGB = (Get-WmiObject -Class "CIM_PhysicalMemory" | Measure-Object -Property Capacity -Sum).Sum / 1GB
+if ($totalRamGB -lt 4) { Handle-BlockingError -ErrorMessage "Insufficient RAM. 4 GB required, $([Math]::Round($totalRamGB, 2)) GB detected." } else { $Global:DiagMsg += "  [PASS] Sufficient RAM installed ($([Math]::Round($totalRamGB, 2)) GB)." }
+if (!$tpmInfo) { Handle-BlockingError -ErrorMessage "TPM not found or disabled in BIOS/UEFI." } elseif (!($tpmInfo.IsEnabled().IsEnabled)) { Handle-BlockingError -ErrorMessage "TPM is present but disabled in Windows." } elseif (!($tpmInfo.IsActivated().IsActivated)) { Handle-BlockingError -ErrorMessage "TPM is present and enabled, but not activated." } else { $Global:DiagMsg += "  [PASS] TPM is present, enabled, and activated." }
+$staleInstallDir = Join-Path -Path $env:SystemDrive -ChildPath "\`$WINDOWS.~WS"
+if (Test-Path $staleInstallDir) { Handle-BlockingError -ErrorMessage "Remains of a previous Windows installation found at '$staleInstallDir'." } else { $Global:DiagMsg += "  [PASS] No conflicting previous installation directories found." }
+$Global:DiagMsg += "`n- Applying pre-flight configurations..."
+try { Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control" -Name "ServicesPipeTimeout" -Value 300000 -Type DWord -Force; $Global:DiagMsg += "  [OK] Service pipe timeout set to 5 minutes." } catch { $Global:DiagMsg += "  [WARN] Could not set service pipe timeout." }
+$Global:DiagMsg += "`nSUCCESS: All eligibility checks passed."
+$Global:DiagMsg += "==============================================================================="
+
+# --- Clear Potential Blockers ---
+Clear-UpgradeBlockers
+
+# --- Download and Execution ---
+$Global:DiagMsg += "`nSUCCESS: System prepared. Proceeding with upgrade."
+$Global:DiagMsg += "==============================================================================="
+$installerFile = Join-Path -Path $scriptDir -ChildPath "installAssistant.exe"
+Invoke-DownloadWithRedirect -Url "https://go.microsoft.com/fwlink/?linkid=2171764" -DestinationFile $installerFile -WhitelistDomain "download.microsoft.com"
+Test-AuthenticodeSignature -FilePath $installerFile -ExpectedCertSubject "Microsoft Code Signing PCA" -ExpectedThumbprint "F252E794FE438E35ACE6E53762C0A234A2C52135" -AppName "Windows 11 Installation Assistant"
+Start-UpgradeProcess -InstallerPath $installerFile
+Confirm-UpgradeIsRunning
+
+# --- Final Message ---
+$Global:DiagMsg += "==============================================================================="
+$Global:DiagMsg += "`n- The Windows 11 upgrade has been successfully initiated."
+$Global:DiagMsg += "  A cleanup task has been created to restore power settings after reboot."
+$Global:DiagMsg += "  The device will reboot automatically to complete the installation."
+$Global:DiagMsg += "  This script's task is now complete."
+$Global:DiagMsg += "==============================================================================="
 
 ######## End of Script ###########
 ##################################
