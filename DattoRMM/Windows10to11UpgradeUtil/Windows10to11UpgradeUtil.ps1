@@ -3,7 +3,7 @@
 # Created by Alex Ivantsov @Exploitacious
 
 # Script Name and Type
-$ScriptName = "In-Place Upgrade W10 to W11 (Robust v1.4)" # Quick and easy name of Script to help identify
+$ScriptName = "In-Place Upgrade W10 to W11" # Quick and easy name of Script to help identify
 $ScriptType = "Remediation" # Monitoring // Remediation
 
 ## Verify/Elevate to Admin Session. Comment out if not needed the single line below.
@@ -45,21 +45,6 @@ $Global:DiagMsg += "Executed On: " + $Date
 ##################################
 ######## Start of Script #########
 
-#<#
-#.SYNOPSIS
-#    A PowerShell script to prepare a Windows 10 system for and initiate an in-place upgrade to Windows 11.
-#    This script is designed to be resilient and run via RMM tools (as SYSTEM), requiring no user interaction.
-#
-#.NOTES
-#    Author: Alex Ivantsov
-#    Date:   August 15, 2025
-#    Version: 1.4 - Added robust power management, WU reset retry loop, and returned to fire-and-forget launch.
-#
-#    DISCLAIMER: This script performs significant system modifications. It is highly recommended to test this script
-#    in a controlled lab environment before deploying to production systems. The author is not responsible for any
-#    data loss or system instability.
-##>
-
 #--------------------------------------------------------------------------------
 # --- User-Modifiable Variables ---
 #--------------------------------------------------------------------------------
@@ -68,7 +53,7 @@ $Global:DiagMsg += "Executed On: " + $Date
 $Win11DownloadUrl = "https://go.microsoft.com/fwlink/?linkid=2171764"
 
 # A robust temporary location for the installer. The script will create C:\Temp if it doesn't exist.
-$InstallerTempDir = "C:\Temp\RMM_Upgrade_Temp"
+$InstallerTempDir = "C:\Temp\Windows11Upgrade"
 $InstallerTempPath = Join-Path -Path $InstallerTempDir -ChildPath "Windows11InstallationAssistant.exe"
 
 # Minimum system requirements for the prerequisite checks.
@@ -81,43 +66,35 @@ $MinimumCpuSpeedGHz = 1.0
 # --- Function Definitions ---
 #--------------------------------------------------------------------------------
 
-Function Set-UpgradePowerPlan {
+Function Set-AlwaysOnPowerSettings {
     <#
     .SYNOPSIS
-        Uses powercfg.exe to create and set a temporary high-performance power plan to prevent sleep.
+        Activates the High Performance power plan and configures it to never sleep or hibernate.
+        These settings are persistent and are not reverted by this script.
     #>
-    $Global:DiagMsg += "INFO: Configuring high-performance power plan to prevent sleep during upgrade..."
+    $Global:DiagMsg += "INFO: Forcing an 'Always On' power configuration..."
     try {
-        # GUID for High Performance plan
+        # GUID for the standard High Performance plan
         $HighPerfGuid = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
-        # Duplicate the plan to a temporary one we can safely delete later
-        $TempPlan = powercfg -duplicatescheme $HighPerfGuid | ForEach-Object { $_.Split(' ')[3] }
-        $Global:RMMTempPowerPlanGUID = $TempPlan # Store GUID in a global variable for later cleanup
-        powercfg -setactive $TempPlan
-        $Global:DiagMsg += "SUCCESS: Temporary high-performance power plan activated."
+        
+        # Set the High Performance plan as active to ensure a consistent base
+        powercfg /setactive $HighPerfGuid
+        $Global:DiagMsg += "  - Activated 'High Performance' power plan."
+        
+        # Configure the active plan to never turn off components or sleep when on AC power
+        powercfg /change monitor-timeout-ac 0
+        $Global:DiagMsg += "  - Set monitor timeout to 'Never'."
+        powercfg /change disk-timeout-ac 0
+        $Global:DiagMsg += "  - Set disk timeout to 'Never'."
+        powercfg /change standby-timeout-ac 0
+        $Global:DiagMsg += "  - Set sleep timeout to 'Never'."
+        powercfg /change hibernate-timeout-ac 0
+        $Global:DiagMsg += "  - Set hibernate timeout to 'Never'."
+        
+        $Global:DiagMsg += "SUCCESS: Power settings configured for 'Always On'."
     }
     catch {
-        $Global:DiagMsg += "WARN: Failed to configure power settings. The upgrade will continue, but the device may sleep."
-    }
-}
-
-Function Restore-PowerPlan {
-    <#
-    .SYNOPSIS
-        Restores the original power plan and deletes the temporary one.
-    #>
-    if ($Global:RMMTempPowerPlanGUID) {
-        $Global:DiagMsg += "INFO: Restoring original power plan..."
-        try {
-            # GUID for Balanced plan is the most common default
-            $BalancedGuid = "381b4222-f694-41f0-9685-ff5bb260df2e"
-            powercfg -setactive $BalancedGuid
-            powercfg -deletescheme $Global:RMMTempPowerPlanGUID
-            $Global:DiagMsg += "SUCCESS: Original power plan restored and temporary plan deleted."
-        }
-        catch {
-            $Global:DiagMsg += "WARN: Could not restore the original power plan."
-        }
+        $Global:DiagMsg += "WARN: Failed to configure all power settings. The upgrade will continue, but the device may sleep. Error: $_"
     }
 }
 
@@ -274,7 +251,7 @@ Function Start-WindowsUpgrade {
 #--------------------------------------------------------------------------------
 # --- Main Script Execution ---
 #--------------------------------------------------------------------------------
-Set-UpgradePowerPlan
+Set-AlwaysOnPowerSettings
 
 # Execute Stage 1: Remove Blockers
 Remove-UpgradeBlockers
@@ -288,9 +265,6 @@ else {
     # Execute Stage 3: Start the Upgrade
     Start-WindowsUpgrade
 }
-
-# Restore the original power plan before exiting
-Restore-PowerPlan
 
 $Global:DiagMsg += "------------------------------------------------------------------"
 $Global:DiagMsg += "Script execution finished."
@@ -324,7 +298,7 @@ $APIinfoHashTable = @{
 # Add Script Result and POST to API if an Endpoint is Provided
 if ($null -ne $env:APIEndpoint) {
     $Global:DiagMsg += " - Sending Results to API"
-    Invoke-WebRequest -Uri $env:APIEndpoint -Method POST -Body ($APIinfoHashTable | ConvertTo-Json) -ContentType "application/json"
+    Invoke-WebRequest -Uri $env:API_Endpoint -Method POST -Body ($APIinfoHashTable | ConvertTo-Json) -ContentType "application/json"
 }
 # Exit with writing diagnostic back to the ticket / remediation component log
 write-DRMMDiag $Global:DiagMsg
