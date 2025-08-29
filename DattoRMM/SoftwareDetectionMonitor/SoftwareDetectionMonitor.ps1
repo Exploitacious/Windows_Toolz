@@ -16,8 +16,8 @@ $Global:AlertHealthy = ""
 
 ## Datto RMM Variables ## Uncomment only for testing. Otherwise, use Datto Variables.
 # These variables MUST be defined in the Datto RMM component.
-$env:softwareName = "DNS" # The name of the software to search for (can be a partial match).
-$env:method = 'NE' # Use 'EQ' to alert if MISSING, or 'NE' to alert if FOUND.
+$env:softwareName = "firefox" # The name of the software to search for (can be a partial match).
+$env:method = 'EQ' # Use 'EQ' to alert if MISSING, or 'NE' to alert if FOUND.
 #$env:usrUDF = 14 # Optional: Which UDF to write the result to. Leave blank to Skip UDF writing.
 
 <#
@@ -70,6 +70,7 @@ function Check-SoftwareInstalled {
     $regPaths = @(
         'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
         'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+        'HKLM:\SOFTWARE\*'
     )
 
     $Global:DiagMsg += "Searching for software matching '$SoftwareName'..."
