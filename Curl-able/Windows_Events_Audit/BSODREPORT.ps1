@@ -326,3 +326,5 @@ Write-Host
 Write-Host "Raw report files have been saved to:"
 Write-Host $ReportOutputDirectory -ForegroundColor Yellow
 Write-Host
+Write-Host
+Write-Host "Type 'exit' to return to the previous menu"
