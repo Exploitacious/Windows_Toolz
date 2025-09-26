@@ -41,6 +41,7 @@
 
     PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/refs/heads/main/Curl-able/Windows_Events_Audit/ClearWindowsEventLog.ps1', 'ClearWindowsEventLog.ps1')"
 
+    PowerShell -executionpolicy bypass -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/refs/heads/main/Curl-able/Windows_Events_Audit/BSODREPORT.ps1', 'BSODREPORT.ps1')"
 
 
 :: Start Running the Gather Logs scripts

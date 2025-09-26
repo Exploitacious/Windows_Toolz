@@ -14,10 +14,11 @@ __        ___         _____                 _     _
 
 # Map choices to filenames
 $scriptMap = @{
-    "1" = "Gather-LogsToTimeLine.ps1"
-    "2" = "Parse-LogsToTimeLine.ps1"
-    "3" = "BaselineSettings.ps1"
-    "4" = "ClearWindowsEventLog.ps1"
+    "1" = "BSODREPORT.ps1"
+    "2" = "Gather-LogsToTimeLine.ps1"
+    "3" = "Parse-LogsToTimeLine.ps1"
+    "4" = "BaselineSettings.ps1"
+    "5" = "ClearWindowsEventLog.ps1"
 }
 
 # Main Loop
@@ -27,10 +28,11 @@ do {
 
     # Script Selector Menu
     $menu = @"
-[ 1 ]  Gather all available Windows Event Logs and Parse them
-[ 2 ]  Parse, Merge and De-dupe gathered logs
-[ 3 ]  Audit Event Log Baseline Settings and Remediate
-[ 4 ]  DANGER: Clear all Windows Event Logs and re-apply Baseline Settings
+[ 1 ]  Run a quick diagnostic for any BSOD, "Critical" or "High" Events
+[ 2 ]  Gather all available Windows Event Logs and Parse them
+[ 3 ]  Parse, Merge and De-dupe gathered logs
+[ 4 ]  Audit Event Log Baseline Settings and Remediate
+[ 5 ]  DANGER: Clear all Windows Event Logs and re-apply Baseline Settings
 [ X ]  Exit
 
 Once you exit the manager script, you can simply type 'ls' to see the scripts available, or
