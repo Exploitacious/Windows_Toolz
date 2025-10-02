@@ -3,7 +3,7 @@
 # Created by Alex Ivantsov @Exploitacious
 
 # Script Name and Type
-$ScriptName = "Analyze Winget-AutoUpdate (WAU) Status (Last 3 Months)" # Quick and easy name of Script to help identify
+$ScriptName = "Analyze Winget-AutoUpdate Status" # Quick and easy name of Script to help identify
 $ScriptType = "Monitoring" # Monitoring // Remediation
 $Date = get-date -Format "MM/dd/yyy hh:mm tt"
 
@@ -15,7 +15,7 @@ $Global:AlertHealthy = "WAU: All applications are reporting as up-to-date." # De
 # if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
 
 ## Datto RMM Variables ## Uncomment only for testing. Otherwise, use Datto Variables. See Explanation Below.
-$env:usrUDF = 14 # Which UDF to write to. Leave blank to Skip UDF writing.
+#$env:usrUDF = 17 # Which UDF to write to. Leave blank to Skip UDF writing.
 #$env:usrString = 'C:\Program Files\Winget-AutoUpdate\logs\updates.log' # Datto User Input variable "usrString" for custom log file path
 
 <#
@@ -29,7 +29,7 @@ You can use as many of these as you like.
 Below you will find all the standard variables to use with Datto RMM to interract with all the the visual, alert and diagnostics cues available from the dashboards.
 #># DattoRMM Alert Functions. Don't touch these unless you know what you're doing.
 function write-DRMMDiag ($messages) {
-    Write-Host  "`n<-Start Diagnostic->"
+    Write-Host "`n<-Start Diagnostic->"
     foreach ($Message in $Messages) { $Message + ' `' }
     Write-Host '<-End Diagnostic->'
     Write-Host
@@ -50,7 +50,7 @@ $ScriptUID = GenRANDString 20 # Generate random UID for script
 $Global:DiagMsg += "Script Type: " + $ScriptType
 $Global:DiagMsg += "Script Name: " + $ScriptName
 $Global:DiagMsg += "Script UID: " + $ScriptUID
-$Global:DiagMsg += "Executed On: " + $Date  
+$Global:DiagMsg += "Executed On: " + $Date
 ##################################
 ##################################
 ######## Start of Script #########
@@ -58,44 +58,33 @@ $Global:DiagMsg += "Executed On: " + $Date
 function Get-WauUpdateData {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $false)]
-        [string]$Path = 'C:\Program Files\Winget-AutoUpdate\logs\updates.log'
+        [Parameter(Mandatory = $true)]
+        [string]$Path
     )
 
-    if (-not (Test-Path -Path $Path -PathType Leaf)) {
-        $Global:DiagMsg += "ERROR: WAU Log file not found at '$Path'."
-        $Global:AlertMsg += "WAU Log file not found at '$Path'. Cannot check update status."
-        return $null
-    }
-
+    # This function now assumes the log file path has already been validated.
     $updateRecords = @()
     $currentDate = $null
-    # A hashtable to temporarily store version info for an app being updated
     $pendingUpdates = @{}
 
     $logContent = Get-Content -Path $Path
     foreach ($line in $logContent) {
-        # 1. Find the date for the current session and clear old pending data
         if ($line -match '#\s+(\d{1,2}/\d{1,2}/\d{4})\s+-') {
             $currentDate = $matches[1]
             $pendingUpdates.Clear()
         }
 
-        # 2. Find the announcement of an available update to get version info
         if ($line -match '-> Available update : (.+?)\. Current version : (.+?)\. Available version : (.*?)\.?$') {
             $appNameAndVersion = $matches[1].Trim()
             $currentVersion = $matches[2].Trim()
             $availableVersion = $matches[3].Trim()
-            # Store the version info, keyed by the full app name string
             $pendingUpdates[$appNameAndVersion] = @{ Current = $currentVersion; Target = $availableVersion }
         }
 
-        # 3. Look for a success message
         if ($line -match '^(\d{2}:\d{2}:\d{2})\s+-\s+(.+?)\s+updated to\s+(.+?)\s+!') {
             $timestamp = $matches[1]
             $appName = $matches[2].Trim()
             $newVersion = $matches[3].Trim()
-            
             $pendingKey = $pendingUpdates.Keys | Where-Object { $_ -like "$appName*" } | Select-Object -First 1
             if ($pendingKey) {
                 $versions = $pendingUpdates[$pendingKey]
@@ -110,11 +99,9 @@ function Get-WauUpdateData {
             }
         }
 
-        # 4. Look for a failure message
         if ($line -match '^(\d{2}:\d{2}:\d{2})\s+-\s+(.+?)\s+update failed\.') {
             $timestamp = $matches[1]
             $failedAppName = $matches[2].Trim()
-
             if ($pendingUpdates.ContainsKey($failedAppName)) {
                 $versions = $pendingUpdates[$failedAppName]
                 $updateRecords += [PSCustomObject]@{
@@ -132,32 +119,83 @@ function Get-WauUpdateData {
 }
 
 function Analyze-WauUpdates {
-    # --- Configuration ---
-    $logPath = if (-not [string]::IsNullOrEmpty($env:usrString)) { $env:usrString } else { 'C:\Program Files\Winget-AutoUpdate\logs\updates.log' }
-    $Global:DiagMsg += "Using WAU log path: $logPath"
+    # --- Step 1: Prerequisite Checks ---
+    $Global:DiagMsg += "--- Starting Prerequisite Checks ---"
+    
+    # 1a: Check if Winget is functional
+    try {
+        $wingetVersion = winget --version | Out-String
+        $Global:DiagMsg += "Winget is functional. Version: $($wingetVersion.Trim())"
+    }
+    catch {
+        $Global:DiagMsg += "CRITICAL: 'winget' command failed. Ensure App Installer is installed/updated from the Microsoft Store."
+        $Global:AlertMsg += "Winget is not functional. Cannot proceed."
+        return
+    }
 
-    # --- Step 1: Gather WAU Update History ---
+    # 1b: Check for Winget-AutoUpdate installation directory
+    $wauInstallPath = "C:\Program Files\Winget-AutoUpdate"
+    $Global:DiagMsg += "Checking for WAU installation at '$wauInstallPath'..."
+    if (-not (Test-Path -Path $wauInstallPath -PathType Container)) {
+        $Global:DiagMsg += "ERROR: Winget-AutoUpdate installation directory not found."
+        $Global:AlertMsg += "Winget-AutoUpdate is not installed."
+        return
+    }
+    $Global:DiagMsg += "WAU installation found."
+
+    # 1c: Check for the main upgrade script
+    $upgradeScriptPath = Join-Path $wauInstallPath "Winget-Upgrade.ps1"
+    $Global:DiagMsg += "Checking for upgrade script at '$upgradeScriptPath'..."
+    if (-not (Test-Path -Path $upgradeScriptPath -PathType Leaf)) {
+        $Global:DiagMsg += "ERROR: The main upgrade script 'Winget-Upgrade.ps1' is missing."
+        $Global:AlertMsg += "WAU installation is corrupt. Missing Winget-Upgrade.ps1."
+        return
+    }
+    $Global:DiagMsg += "Upgrade script found."
+
+    # 1d: Check for the log file, if not found, run the updater
+    $logPath = if (-not [string]::IsNullOrEmpty($env:usrString)) { $env:usrString } else { Join-Path $wauInstallPath "logs\updates.log" }
+    $Global:DiagMsg += "Checking for log file at '$logPath'..."
+    if (-not (Test-Path -Path $logPath -PathType Leaf)) {
+        $Global:DiagMsg += "Log file not found. This may be a new installation. Initiating a background run of the upgrade script."
+        try {
+            Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$upgradeScriptPath`"" -NoNewWindow
+            $Global:DiagMsg += "Successfully launched the WAU upgrade script."
+            $Global:varUDFString += "Auto Upgrade Launched"
+            $Global:AlertHealthy = "WAU: Log file not found, initiated a background update check." # Set custom healthy message
+        }
+        catch {
+            $Global:DiagMsg += "ERROR: Failed to launch the upgrade script. Error: $($_.Exception.Message)"
+            $Global:AlertMsg += "WAU: Log file missing and failed to launch upgrade script."
+        }
+        return # Exit analysis, script will now exit with either healthy or alert status
+    }
+    $Global:DiagMsg += "Log file found. Proceeding with analysis."
+    $Global:DiagMsg += "--- Prerequisite Checks Passed ---"
+
+    # --- Step 2: Gather WAU Update History ---
     $Global:DiagMsg += "Gathering update history from WAU logs..."
     $wauHistory = Get-WauUpdateData -Path $logPath
     
-    if ($Global:AlertMsg) { return }
-
-    # --- NEW: Filter history to only include the last 3 months ---
+    # Filter history to only include the last 3 months
     $threeMonthsAgo = (Get-Date).AddMonths(-3)
     $wauHistory = $wauHistory | Where-Object { $_.DateTime -ge $threeMonthsAgo }
     $Global:DiagMsg += "Analyzing update records since $($threeMonthsAgo.ToString('MM/dd/yyyy'))..."
 
     if (-not $wauHistory) {
         $Global:DiagMsg += "No update history found in the WAU log file within the last 3 months."
+        $Global:varUDFString += "No updates in 3 months"
         return
     }
 
-    # --- Step 2: Get Currently Installed Apps from Winget ---
-    $Global:DiagMsg += "Getting currently installed applications from Winget (this may take a moment)..."
+    # --- Step 3: Get Currently Installed Apps from Winget ---
+    $Global:DiagMsg += "Getting currently installed applications from Winget..."
     $installedApps = @{}
     try {
+        # Using --id to get a more reliable identifier
         $wingetOutput = winget list --accept-source-agreements
         foreach ($line in $wingetOutput) {
+            # Improved Regex for winget list output
             if ($line -match '^(.+?)\s{2,}([\w\.\-]+)\s+([^\s]+)') {
                 $name = $matches[1].Trim()
                 $id = $matches[2].Trim()
@@ -169,15 +207,14 @@ function Analyze-WauUpdates {
         }
     }
     catch {
-        $Global:DiagMsg += "ERROR: Failed to execute 'winget list'. Ensure Winget is installed and working correctly. Error: $($_.Exception.Message)"
+        $Global:DiagMsg += "ERROR: Failed to execute 'winget list'. Error: $($_.Exception.Message)"
         $Global:AlertMsg += "Failed to execute 'winget list'. Cannot check application versions."
         return
     }
     
-    # --- Step 3: Analyze and Compare ---
+    # --- Step 4: Analyze and Compare ---
     $Global:DiagMsg += "Analyzing update history against installed applications..."
     $analysisResults = @()
-
     $groupedHistory = $wauHistory | Group-Object { ($_.Application -split '\d', 2)[0].Trim() }
 
     foreach ($appGroup in $groupedHistory) {
@@ -216,11 +253,10 @@ function Analyze-WauUpdates {
             }
         }
         
-        # --- NEW: Consolidated Status for Summary ---
         $consolidatedStatus = switch ($overallStatus) {
             { $_ -like 'Up-to-date*' } { 'Successful' }
             'Update Pending/Failed' { 'Failed' }
-            default { 'Unknown' } # Covers 'Uninstalled or Renamed' and 'Unknown (Version Incompatible)'
+            default { 'Unknown' }
         }
 
         $analysisResults += [PSCustomObject]@{
@@ -234,13 +270,12 @@ function Analyze-WauUpdates {
         }
     }
 
-    # --- Step 4: Populate Datto RMM Variables ---
+    # --- Step 5: Populate Datto RMM Variables ---
     if ($analysisResults.Count -gt 0) {
         $reportTable = $analysisResults | Sort-Object ApplicationName | Select-Object ApplicationName, LastAttempt, LastResult, AttemptedUpdate, InstalledVersion, OverallStatus | Format-Table -AutoSize | Out-String
         $Global:DiagMsg += "`n--- WAU Application Status Report (Last 3 Months) ---"
         $Global:DiagMsg += $reportTable
 
-        # --- UPDATED: Group by consolidated status ---
         $summary = $analysisResults | Group-Object -Property ConsolidatedStatus
         $Global:DiagMsg += "`n--- Summary ---"
         $udfSummary = @()
@@ -254,7 +289,7 @@ function Analyze-WauUpdates {
         if ($failingApps) {
             $Global:AlertMsg += "WAU Failure: $($failingApps.Count) application(s) require attention: $($failingApps.ApplicationName -join ', ')"
             $failingAppsList = $failingApps | Select-Object ApplicationName, InstalledVersion, AttemptedUpdate | Format-Table -AutoSize | Out-String
-            $Global:DiagMsg += "`n--- ⚠️ WARNING: ACTION REQUIRED ⚠️ ---"
+            $Global:DiagMsg += "`n--- WARNING: FAILED UPDATES ---"
             $Global:DiagMsg += "The following applications have failed to update and are still on an old version:"
             $Global:DiagMsg += $failingAppsList
         }
@@ -272,17 +307,17 @@ Analyze-WauUpdates
 ##################################
 ##################################
 ### Write to UDF if usrUDF (Write To) Number is defined. (Optional)
-if ($env:usrUDF -ge 1) {     
+if ($env:usrUDF -ge 1) {
     if ($Global:varUDFString.length -gt 255) {
         # Write UDF to diaglog
-        $Global:DiagMsg += " - Writing to UDF $env:usrUDF : " + $Global:varUDFString 
-        # Limit UDF Entry to 255 Characters 
-        Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString.substring(0, 255)) -Force
+        $Global:DiagMsg += " - Writing to UDF $env:usrUDF : " + $Global:varUDFString
+        # Limit UDF Entry to 255 Characters
+        Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($Global:varUDFString.substring(0, 255)) -Force
     }
     else {
         # Write to diagLog and UDF
-        $Global:DiagMsg += " - Writing to UDF $env:usrUDF : " + $Global:varUDFString 
-        Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString) -Force
+        $Global:DiagMsg += " - Writing to UDF $env:usrUDF : " + $Global:varUDFString
+        Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($Global:varUDFString) -Force
     }
 }
 ### Exit script with proper Datto alerting, diagnostic and API Results.

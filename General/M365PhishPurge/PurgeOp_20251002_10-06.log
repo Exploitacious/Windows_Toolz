@@ -1,0 +1,8 @@
+[2025-10-02 10:08:40] Creating and starting compliance search...
+[2025-10-02 10:10:13] Total Items Found: 4
+[2025-10-02 10:10:13] Search Query: subject:"Task-Report: System Message Ticket notification"
+[2025-10-02 10:11:27] Purge Type: HardDelete
+[2025-10-02 10:11:27] Items Purged: Purge Type: HardDelete; Item count: 0; Total size 0; Details: {}
+[2025-10-02 10:11:27] Items have been permanently deleted and are not recoverable.
+[2025-10-02 10:11:57] Adding Email muse-eek.com to Global Blocklist
+[2025-10-02 10:11:58] Sender muse-eek.com has been added to the blocklist.

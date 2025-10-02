@@ -1,75 +1,27 @@
-#
-## Template for Remediation Components for Datto RMM with PowerShell
-# Created by Alex Ivantsov @Exploitacious
-
-# Script Name and Type
-$ScriptName = "Install or Update WinGet (and Winget-AutoUpdate)" # Quick and easy name of Script to help identify
-$ScriptType = "Remediation" # Monitoring // Remediation
-
-## Verify/Elevate to Admin Session. Comment out if not needed the single line below.
-# if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs; exit }
-
-## Datto RMM Variables ## Uncomment only for testing. Otherwise, use Datto Variables. See Explanation Below.
-#$env:APIEndpoint = "https://prod-36.westus.logic.azure.com:443/workflows/6c032a1ca84045b9a7a1436864ecf696/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=c-dVa333HMzhWli_Fp_4IIAqaJOMwFjP2y5Zfv4j_zA"
-#$env:usrUDF = 14 # Which UDF to write to. Leave blank to Skip UDF writing.
-#$env:usrForceUpdate = $true # Datto User Input variable. Set to $true to force reinstall of WinGet.
-$env:usrInstallAutoUpdate = $true # Datto User Input variable. Set to $true to install Winget-AutoUpdate.
-
-<#
-This Script is a Remediation compoenent, meaning it performs only one task with a log of granular detail. These task results can be added back ito tickets as time entries using the API.
-
-To create Variables in Datto RMM Script component, you must use $env variables in the powershell script, simply by matching the name and adding "env:" before them.
-For example, in Datto we can use a variable for user input called "usrUDF" and here we use "$env:usrUDF=" to use that variable.
-
-You can use as many of these as you like.
-
-Below you will find all the standard variables to use with Datto RMM to interract with all the the visual, alert and diagnostics cues available from the dashboards.
-#># DattoRMM Alert Functions. Don't touch these unless you know what you're doing.
-function write-DRMMDiag ($messages) {
-    Write-Host  '<-Start Diagnostic->'
-    foreach ($Message in $Messages) { $Message + ' `' }
-    Write-Host '<-End Diagnostic->'
-}
-function genRandString ([int]$length, [string]$chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') {
-    return -join ((1..$length) | ForEach-Object { Get-Random -InputObject $chars.ToCharArray() })
-}
-# Extra Info and Variables (Leave at default)
-$Global:DiagMsg = @() # Running Diagnostic log (diaglog). Use " $Global:DiagMsg += " to append messages to this log for verboseness in the script.
-$Global:varUDFString = @() # String which will be written to UDF, if UDF Number is defined by $usrUDF in Datto. Use " $Global:varUDFString += " to fill this string.
-$ScriptUID = GenRANDString 20 # Generate random UID for script
-$Date = get-date -Format "MM/dd/yyy hh:mm tt"
-$Global:DiagMsg += "Script Type: " + $ScriptType
-$Global:DiagMsg += "Script Name: " + $ScriptName
-$Global:DiagMsg += "Script UID: " + $ScriptUID
-$Global:DiagMsg += "Executed On: " + $Date
-##################################
-##################################
-######## Start of Script #########
-
-
-
 <#
 .SYNOPSIS
-    Installs or updates the Windows Package Manager (WinGet) and optionally installs Winget-AutoUpdate.
+    Installs or updates the Windows Package Manager (WinGet) for the current user.
 
 .DESCRIPTION
-    This script provides a fully automated method for installing the latest version of WinGet.
-    After a successful WinGet installation, it can also install the Winget-AutoUpdate utility.
+    This script provides a fully automated method for installing the latest version of the
+    Windows Package Manager (WinGet) on PowerShell 5.1. It is designed to run without
+    any parameters and handles all necessary prerequisite checks, dependency resolution,
+    and installation steps.
 
     The script performs the following actions:
-    1. Checks for a compatible Windows version and internet connectivity.
-    2. Handles administrative elevation gracefully.
-    3. Detects if a functional version of WinGet is already installed.
-    4. Downloads and installs WinGet and its dependencies if needed or forced.
-    5. Verifies the WinGet installation.
-    6. If verification is successful and the corresponding Datto variable is set, it uses WinGet
-       to install 'Romanitho.Winget-AutoUpdate'.
-    7. Cleans up all temporary files upon completion.
+    1. Checks for a compatible Windows version (Windows 10 build 17763 or newer).
+    2. Verifies internet connectivity.
+    3. Handles administrative elevation gracefully to query and install system-wide packages.
+    4. Detects if a functional version of WinGet is already installed.
+    5. If WinGet is missing, outdated, or a forced update is requested, it downloads the latest version.
+    6. Automatically identifies, downloads, and prepares required dependencies (like UI.Xaml and VCLibs).
+    7. Installs WinGet along with its dependencies.
+    8. Cleans up all temporary files upon completion.
 
 .NOTES
     Author: Alex Ivantsov
     Date:   October 2, 2025
-    Version: 1.1
+    Version: 1.0
     PowerShell Version: 5.1 (No external modules required)
 
 .LINK
@@ -80,24 +32,9 @@ $Global:DiagMsg += "Executed On: " + $Date
 # --- USER CONFIGURABLE VARIABLES ---
 #------------------------------------------------------------------------------------
 
-# Check for Datto RMM variable to force update. Create a boolean variable in the Datto component named "usrForceUpdate".
-if ($env:usrForceUpdate -eq 'true' -or $env:usrForceUpdate -eq 1) {
-    $Global:ForceUpdate = $true
-    $Global:DiagMsg += "Datto RMM variable 'usrForceUpdate' is set. Forcing reinstall of WinGet."
-}
-else {
-    $Global:ForceUpdate = $false
-}
-
-# Check for Datto RMM variable to install Winget-AutoUpdate. Create a boolean variable in the Datto component named "usrInstallAutoUpdate".
-if ($env:usrInstallAutoUpdate -eq 'true' -or $env:usrInstallAutoUpdate -eq 1) {
-    $Global:InstallAutoUpdate = $true
-    $Global:DiagMsg += "Datto RMM variable 'usrInstallAutoUpdate' is set. Will install Winget-AutoUpdate after WinGet."
-}
-else {
-    $Global:InstallAutoUpdate = $false
-}
-
+# Set to $true to reinstall WinGet even if it's already present and up to date.
+# Set to $false to skip installation if a working version of WinGet is detected.
+$Global:ForceUpdate = $false
 
 #------------------------------------------------------------------------------------
 # --- HELPER FUNCTIONS ---
@@ -107,10 +44,18 @@ function Get-SystemInfo {
     <#
     .SYNOPSIS
         Gathers essential information about the operating system and environment.
+    .DESCRIPTION
+        This function collects OS version, architecture, and PowerShell session details.
+        It returns a custom object containing these properties for use by other functions.
+    .OUTPUTS
+        [PSCustomObject] An object with system information.
     #>
     Write-Host "Gathering system information..."
 
+    # Determine if the OS is 64-bit. This is a reliable method in PowerShell 5.1.
     $is64BitOS = [System.Environment]::Is64BitOperatingSystem
+
+    # Determine the processor architecture string (x86, x64, arm, arm64).
     $architecture = switch ($env:PROCESSOR_ARCHITECTURE) {
         "AMD64" { "x64"; break }
         "x86" { "x86"; break }
@@ -119,9 +64,10 @@ function Get-SystemInfo {
         default { if ($is64BitOS) { "x64" } else { "x86" } }
     }
 
+    # Create and return a custom object with all the gathered information.
     return [PSCustomObject]@{
         OSVersion    = [System.Environment]::OSVersion.Version
-        IsWindows    = $PSVersionTable.PSVersion.Major -ge 3
+        IsWindows    = $PSVersionTable.PSVersion.Major -ge 3 # A simple check for Windows PowerShell
         Architecture = $architecture
         IsElevated   = (New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
         TempPath     = $env:TEMP
@@ -132,6 +78,11 @@ function Test-Prerequisites {
     <#
     .SYNOPSIS
         Checks if the system meets all requirements for installing WinGet.
+    .DESCRIPTION
+        Validates the OS version and internet connectivity. Halts the script if
+        requirements are not met.
+    .PARAMETER SystemInfo
+        The system information object from Get-SystemInfo.
     #>
     param (
         [Parameter(Mandatory = $true)]
@@ -139,14 +90,19 @@ function Test-Prerequisites {
     )
 
     Write-Host "Verifying system prerequisites..."
+
+    # Define the minimum supported Windows 10 version for WinGet (1809).
     $supportedWindowsVersion = [System.Version]'10.0.17763.0'
 
+    # Check 1: Ensure the script is running on a supported Windows version.
     if (-not $SystemInfo.IsWindows -or $SystemInfo.OSVersion -lt $supportedWindowsVersion) {
         Write-Error "SCRIPT HALTED: WinGet requires Windows 10 version 1809 (build 17763) or newer."
         return $false
     }
 
+    # Check 2: Verify that there is an active internet connection.
     try {
+        # Test-Connection is a reliable way to check for general internet access.
         if (-not (Test-Connection -ComputerName "8.8.8.8" -Count 1 -Quiet -ErrorAction Stop)) {
             Write-Error "SCRIPT HALTED: An active internet connection is required."
             return $false
@@ -165,6 +121,13 @@ function Get-AllUserAppxPackages {
     <#
     .SYNOPSIS
         Retrieves a list of all AppX packages installed for all users on the system.
+    .DESCRIPTION
+        This function requires administrative privileges. If the current session is not
+        elevated, it spawns a temporary elevated PowerShell process to get the data,
+        exports it to a temp file, and then imports it back into the current session.
+        This avoids forcing the user to run the entire script as an administrator.
+    .OUTPUTS
+        [Array] An array of AppX package objects.
     #>
     param (
         [Parameter(Mandatory = $true)]
@@ -172,13 +135,21 @@ function Get-AllUserAppxPackages {
     )
 
     if ($SystemInfo.IsElevated) {
+        # If already running as admin, just get the packages directly.
         return @(Get-AppxPackage -AllUsers -ErrorAction SilentlyContinue)
     }
     else {
+        # If not elevated, use a common technique to get elevated data without
+        # re-running the whole script as admin.
         Write-Warning "Elevation is required to check system-wide packages. A UAC prompt will appear."
+        
         $tempFile = Join-Path $SystemInfo.TempPath ([System.Guid]::NewGuid().ToString() + ".clixml")
+        
+        # Command to be executed in the new elevated process.
         $command = "Get-AppxPackage -AllUsers | Export-Clixml -Path '$tempFile' -Force"
         
+        # Start a new PowerShell process with administrative rights (-Verb RunAs).
+        # It runs hidden (-WindowStyle Hidden) and waits for completion (-Wait).
         $processInfo = @{
             FilePath     = "powershell.exe"
             ArgumentList = "-NoProfile -Command `"$command`""
@@ -188,6 +159,7 @@ function Get-AllUserAppxPackages {
         }
         Start-Process @processInfo
 
+        # Import the data from the temporary file.
         if (Test-Path $tempFile) {
             $packages = Import-Clixml -Path $tempFile
             Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
@@ -204,20 +176,34 @@ function Find-WinGetExecutable {
     <#
     .SYNOPSIS
         Locates the full path to the winget.exe executable.
+    .DESCRIPTION
+        WinGet can be installed in different locations. This function checks the standard
+        user and system paths to find the most recent version of winget.exe.
+    .OUTPUTS
+        [String] The full path to winget.exe, or $null if not found.
     #>
+    
+    # Define potential paths for winget.exe.
     $userPath = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\winget.exe"
     $systemPath = "$env:ProgramFiles\WindowsApps\Microsoft.DesktopAppInstaller_*_8wekyb3d8bbwe\winget.exe"
 
+    # Prefer the system-wide installation if it exists, as it's often more stable.
     if (Test-Path $systemPath) {
         try {
+            # If multiple versions exist, find the latest one based on its file version.
             return (Get-Item $systemPath | Sort-Object -Property FileVersionRaw | Select-Object -Last 1).FullName
         }
-        catch {}
+        catch {
+            # Fallback if sorting fails.
+        }
     }
     
+    # Check the user-specific path if the system path check fails.
     if (Test-Path $userPath) {
         return $userPath
     }
+
+    # Return null if not found in any standard location.
     return $null
 }
 
@@ -225,6 +211,15 @@ function Test-WinGetInstallation {
     <#
     .SYNOPSIS
         Checks if WinGet is installed, functional, and up to date.
+    .DESCRIPTION
+        This function first tries to locate winget.exe. If found, it checks its version
+        to see if it is a retired version that must be updated. It also attempts to
+        re-register the AppX package, which can fix common issues where the .exe exists
+        but is not properly linked.
+    .PARAMETER AllUserPackages
+        An array of all user AppX packages from Get-AllUserAppxPackages.
+    .OUTPUTS
+        [String] Returns 'OK', 'Retired', or 'NotFound'.
     #>
     param (
         [Parameter(Mandatory = $true)]
@@ -233,27 +228,30 @@ function Test-WinGetInstallation {
 
     Write-Host "Checking for existing WinGet installation..."
     
+    # Attempt to fix a common issue where WinGet is installed but not registered for the current user.
     $desktopAppInstaller = $AllUserPackages | Where-Object { $_.Name -eq "Microsoft.DesktopAppInstaller" }
     if ($desktopAppInstaller) {
         try {
             Add-AppxPackage -DisableDevelopmentMode -Register ($desktopAppInstaller.InstallLocation + "\AppxManifest.xml") -ErrorAction Stop | Out-Null
-            Start-Sleep -Seconds 2
+            Start-Sleep -Seconds 2 # Allow time for registration.
         }
         catch {
             Write-Warning "Could not re-register the existing Microsoft Desktop App Installer package."
         }
     }
 
+    # Now, check if the executable can be found.
     $wingetPath = Find-WinGetExecutable
     if (-not $wingetPath) {
         Write-Host "WinGet is not installed."
         return 'NotFound'
     }
 
+    # If the executable exists, check its version. Versions 1.2 and older used retired CDNs and must be updated.
     try {
         $versionString = (& $wingetPath --version).Replace("v", "")
         $currentVersion = [System.Version]$versionString
-        $retiredVersion = [System.Version]'1.3.0.0'
+        $retiredVersion = [System.Version]'1.3.0.0' # Versions older than 1.3 are considered retired.
 
         if ($currentVersion -lt $retiredVersion) {
             Write-Warning "Found a retired version of WinGet ($currentVersion). An update is required."
@@ -273,6 +271,12 @@ function Download-FileWithRetry {
     <#
     .SYNOPSIS
         Downloads a file from a URL with retry logic.
+    .DESCRIPTION
+        A robust wrapper for Invoke-WebRequest that handles transient network errors by retrying.
+    .PARAMETER Uri
+        The URL of the file to download.
+    .PARAMETER OutFile
+        The local path to save the file.
     #>
     param (
         [Parameter(Mandatory = $true)]
@@ -284,6 +288,8 @@ function Download-FileWithRetry {
     $maxRetries = 3
     for ($i = 1; $i -le $maxRetries; $i++) {
         try {
+            # PowerShell 5.1 can be slow without -UseBasicParsing.
+            # -ErrorAction Stop ensures that failures are caught by the catch block.
             $webRequestParams = @{
                 Uri             = $Uri
                 OutFile         = $OutFile
@@ -291,6 +297,8 @@ function Download-FileWithRetry {
                 ErrorAction     = 'Stop'
             }
             Invoke-WebRequest @webRequestParams
+            
+            # If download succeeds, exit the loop.
             return $true
         }
         catch {
@@ -307,6 +315,13 @@ function Resolve-And-Install-WinGet {
     <#
     .SYNOPSIS
         The core function that handles the entire download, dependency resolution, and installation process.
+    .DESCRIPTION
+        This function downloads the WinGet .msixbundle, inspects its manifest to find dependencies,
+        downloads any missing dependencies, and then orchestrates the final installation.
+    .PARAMETER SystemInfo
+        The system information object.
+    .PARAMETER AllUserPackages
+        An array of all user AppX packages.
     #>
     param(
         [Parameter(Mandatory = $true)]
@@ -315,6 +330,8 @@ function Resolve-And-Install-WinGet {
         [Array]$AllUserPackages
     )
 
+    # 1. Download the latest WinGet package
+    #-----------------------------------------
     Write-Host "Downloading the latest WinGet package..."
     $wingetUrl = "https://aka.ms/getwinget"
     $tempWingetBundle = Join-Path $SystemInfo.TempPath "winget.msixbundle"
@@ -324,13 +341,18 @@ function Resolve-And-Install-WinGet {
     }
     Write-Host "WinGet package downloaded successfully." -ForegroundColor Green
 
+    # 2. Extract the manifest from the package to find dependencies
+    #-----------------------------------------
     Write-Host "Resolving WinGet dependencies..."
     $dependenciesToInstall = [System.Collections.Generic.List[string]]::new()
     $tempExtractionDir = Join-Path $SystemInfo.TempPath ([System.Guid]::NewGuid().ToString())
     New-Item -Path $tempExtractionDir -ItemType Directory -Force | Out-Null
     
     try {
+        # Load the assembly required to work with .zip files (which .msixbundle is).
         Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+        # Unzip the bundle to get the main .msix file for the correct architecture.
         [System.IO.Compression.ZipFile]::ExtractToDirectory($tempWingetBundle, $tempExtractionDir)
         $msixFile = Get-ChildItem -Path $tempExtractionDir -Filter "*.msix" | Where-Object { $_.Name -like "*$($SystemInfo.Architecture)*" } | Select-Object -First 1
         
@@ -338,27 +360,38 @@ function Resolve-And-Install-WinGet {
             throw "Could not find a matching .msix file for architecture '$($SystemInfo.Architecture)' in the bundle."
         }
 
+        # Unzip the .msix file to read its manifest.
         $msixExtractionDir = Join-Path $SystemInfo.TempPath ([System.Guid]::NewGuid().ToString())
         [System.IO.Compression.ZipFile]::ExtractToDirectory($msixFile.FullName, $msixExtractionDir)
+        
+        # Load the AppxManifest.xml file.
         [xml]$manifest = Get-Content -Path (Join-Path $msixExtractionDir "AppxManifest.xml")
 
+        # Loop through each dependency declared in the manifest.
         foreach ($dependency in $manifest.Package.Dependencies.PackageDependency) {
             $depName = $dependency.Name
             $depMinVersion = [System.Version]$dependency.MinVersion
+
             Write-Host "Checking dependency: $depName (version $depMinVersion or newer)"
+
+            # Check if a suitable version of the dependency is already installed for any user.
             $installedDep = $AllUserPackages | Where-Object { $_.Name -eq $depName -and [System.Version]$_.Version -ge $depMinVersion }
             
             if ($installedDep) {
                 Write-Host " -> Dependency '$depName' is already satisfied." -ForegroundColor Green
-                continue
+                continue # Move to the next dependency.
             }
 
+            # If dependency is not met, download it.
             Write-Warning " -> Dependency '$depName' is missing. Attempting to download."
+            
             $depFile = ""
             if ($depName -like "Microsoft.UI.Xaml*") {
+                # UI.Xaml is distributed as a NuGet package (.nupkg).
                 $nupkgUrl = "https://www.nuget.org/api/v2/package/$depName/$($depMinVersion.ToString())"
                 $nupkgFile = Join-Path $SystemInfo.TempPath "$depName.nupkg"
                 if (Download-FileWithRetry -Uri $nupkgUrl -OutFile $nupkgFile) {
+                    # Extract the .appx from the .nupkg (which is a zip file).
                     $nupkgExtractionDir = Join-Path $SystemInfo.TempPath "$depName-nupkg"
                     [System.IO.Compression.ZipFile]::ExtractToDirectory($nupkgFile, $nupkgExtractionDir)
                     $appxInNupkg = Get-ChildItem -Path $nupkgExtractionDir -Recurse -Filter "*.appx" | Select-Object -First 1
@@ -369,12 +402,13 @@ function Resolve-And-Install-WinGet {
                 }
             }
             elseif ($depName -like "Microsoft.VCLibs*") {
+                # VCLibs are distributed directly as .appx files from a Microsoft URL.
                 $vcLibsVersion = "$($depMinVersion.Major).00"
                 $vcLibsFileName = "Microsoft.VCLibs.$($SystemInfo.Architecture).$vcLibsVersion.Desktop.appx"
                 $vcLibsUrl = "https://aka.ms/$vcLibsFileName"
                 $depFile = Join-Path $SystemInfo.TempPath $vcLibsFileName
                 if (-not (Download-FileWithRetry -Uri $vcLibsUrl -OutFile $depFile)) {
-                    $depFile = ""
+                    $depFile = "" # Clear on failure
                 }
             }
 
@@ -391,23 +425,29 @@ function Resolve-And-Install-WinGet {
         return $false
     }
     finally {
+        # Clean up temporary extraction folders.
         Remove-Item -Path $tempExtractionDir -Recurse -Force -ErrorAction SilentlyContinue
         if (Test-Path $msixExtractionDir) {
             Remove-Item -Path $msixExtractionDir -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
     
+    # 3. Install WinGet with all required dependencies
+    #-----------------------------------------
     Write-Host "Starting WinGet installation..."
     try {
         $installParams = @{
             Path                           = $tempWingetBundle
-            ForceTargetApplicationShutdown = $true
+            ForceTargetApplicationShutdown = $true # Closes related apps if necessary.
             ErrorAction                    = 'Stop'
         }
+        # Add the -DependencyPath parameter only if we have dependencies to install.
         if ($dependenciesToInstall.Count -gt 0) {
             $installParams.Add("DependencyPath", $dependenciesToInstall)
         }
+        
         Add-AppxPackage @installParams
+        
         Write-Host "WinGet installation command executed successfully." -ForegroundColor Green
     }
     catch {
@@ -415,6 +455,7 @@ function Resolve-And-Install-WinGet {
         return $false
     }
     finally {
+        # Clean up all downloaded package files.
         Remove-Item -Path $tempWingetBundle -Force -ErrorAction SilentlyContinue
         foreach ($dep in $dependenciesToInstall) {
             Remove-Item -Path $dep -Force -ErrorAction SilentlyContinue
@@ -428,27 +469,34 @@ function Resolve-And-Install-WinGet {
 # --- SCRIPT EXECUTION ---
 #------------------------------------------------------------------------------------
 
+# Clear the screen for better readability of the output.
 Clear-Host
+
 Write-Host "========================================"
 Write-Host "  Automated WinGet Installer"
 Write-Host "  Author: Alex Ivantsov"
 Write-Host "========================================"
 Write-Host
 
+# Step 1: Gather system information.
 $systemInfo = Get-SystemInfo
 
+# Step 2: Check prerequisites. If they fail, the script stops.
 if (-not (Test-Prerequisites -SystemInfo $systemInfo)) {
     Exit 1
 }
 
+# Step 3: Get a list of all installed AppX packages. This may trigger a UAC prompt.
 $allUserPackages = Get-AllUserAppxPackages -SystemInfo $systemInfo
 if ($allUserPackages.Count -eq 0) {
     Write-Error "Could not retrieve the list of installed AppX packages. Cannot continue."
     Exit 1
 }
 
+# Step 4: Check the current state of the WinGet installation.
 $wingetStatus = Test-WinGetInstallation -AllUserPackages $allUserPackages
 
+# Step 5: Decide whether to proceed with installation.
 $needsInstall = $false
 if ($wingetStatus -eq 'NotFound' -or $wingetStatus -eq 'Retired') {
     $needsInstall = $true
@@ -458,154 +506,27 @@ elseif ($Global:ForceUpdate) {
     $needsInstall = $true
 }
 else {
-    Write-Host "WinGet is already installed and up to date."
+    Write-Host "WinGet is already installed and up to date. No action needed."
 }
 
+# Step 6: Run the installation process if needed.
 if ($needsInstall) {
     $installSuccess = Resolve-And-Install-WinGet -SystemInfo $systemInfo -AllUserPackages $allUserPackages
     
+    # Final verification
     if ($installSuccess) {
         Write-Host "Verifying installation..."
-        Start-Sleep -Seconds 3
+        Start-Sleep -Seconds 3 # Give Windows a moment to finalize the installation.
         if ((Test-WinGetInstallation -AllUserPackages (Get-AllUserAppxPackages -SystemInfo $systemInfo)) -eq 'OK') {
             Write-Host "`nSCRIPT COMPLETE: WinGet has been successfully installed." -ForegroundColor Green
         }
         else {
             Write-Error "`nSCRIPT FAILED: Installation command was sent, but WinGet is still not functional."
-            # Set needsInstall back to false since the primary goal failed
-            $needsInstall = $false
         }
     }
     else {
         Write-Error "`nSCRIPT FAILED: The installation process encountered an unrecoverable error."
-        # Set needsInstall back to false since the primary goal failed
-        $needsInstall = $false
     }
 }
 
-# If WinGet is installed (either previously or just now) AND the user wants to install the autoupdater
-if (($needsInstall -or ($wingetStatus -eq 'OK')) -and $Global:InstallAutoUpdate) {
-    Write-Host "----------------------------------------"
-    
-    $upgradeScriptPath = "C:\Program Files\Winget-AutoUpdate\Winget-Upgrade.ps1"
-
-    # 1. Check if the upgrade script is already available
-    Write-Host "Checking if '$upgradeScriptPath' is available..."
-    if (Test-Path $upgradeScriptPath) {
-        Write-Host "'$upgradeScriptPath' is available. Attempting to launch as the logged-in user."
-        
-        # Find the active logged-in user to run the process in their context
-        $explorerProcess = Get-CimInstance -ClassName Win32_Process -Filter "Name = 'explorer.exe'" | Select-Object -First 1
-        if ($explorerProcess) {
-            $ownerInfo = Invoke-CimMethod -InputObject $explorerProcess -MethodName GetOwner
-            $currentUser = "$($ownerInfo.Domain)\$($ownerInfo.User)"
-            
-            Write-Host "Found active user: $currentUser. Creating a temporary task to run the upgrade script."
-            
-            try {
-                # Define the action to run the upgrade script
-                $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-ExecutionPolicy Bypass -File `"$upgradeScriptPath`""
-                
-                # Register the task to run immediately as the current user
-                $taskName = "RunWingetAutoUpdateOnce"
-                Register-ScheduledTask -TaskName $taskName -Action $taskAction -User $currentUser -RunLevel Limited -Force | Out-Null
-                
-                # Start the task
-                Start-ScheduledTask -TaskName $taskName
-                
-                # Clean up by removing the temporary task
-                Start-Sleep -Seconds 5 # Give the task a moment to start before unregistering
-                Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-                
-                # State the required message and exit successfully
-                Write-Host "Auto Upgrade Launched" -ForegroundColor Cyan
-                Exit 0
-            }
-            catch {
-                Write-Error "Failed to create or run the scheduled task for the user. Error: $($_.Exception.Message)"
-                Write-Warning "Continuing to installation checks as a fallback."
-            }
-        }
-        else {
-            Write-Warning "No logged-in user found (no explorer.exe process). Skipping user-context upgrade."
-        }
-    }
-    else {
-        Write-Host "'$upgradeScriptPath' not available. Proceeding with installation checks."
-    }
-
-    # --- Fallback to installation logic if upgrade script wasn't found or couldn't be launched ---
-    $wingetExePath = Find-WinGetExecutable
-    
-    if ($wingetExePath) {
-        # (The rest of your installation logic remains here...)
-        $autoUpdatePackageId = "Romanitho.Winget-AutoUpdate"
-        $processName = "Winget-AutoUpdate.GUI"
-
-        Write-Host "Checking if '$processName' process is running..."
-        $runningProcess = Get-Process -Name $processName -ErrorAction SilentlyContinue
-
-        if ($runningProcess) {
-            Write-Host "Winget-AutoUpdate is already running. No action needed." -ForegroundColor Green
-        }
-        else {
-            Write-Host "Process not running. Checking if '$autoUpdatePackageId' is installed..."
-            $installedApp = & $wingetExePath list --id $autoUpdatePackageId --source winget --accept-source-agreements 2>$null
-            
-            if ($installedApp) {
-                Write-Host "Winget-AutoUpdate is already installed but not running. No action needed." -ForegroundColor Green
-            }
-            else {
-                Write-Host "Attempting to install Winget-AutoUpdate..."
-                try {
-                    $arguments = "install --id $autoUpdatePackageId --source winget --accept-package-agreements --accept-source-agreements --silent"
-                    Start-Process -FilePath $wingetExePath -ArgumentList $arguments -Wait -NoNewWindow -ErrorAction Stop
-                    Write-Host "Successfully installed Winget-AutoUpdate." -ForegroundColor Green
-                }
-                catch {
-                    Write-Error "Failed to install Winget-AutoUpdate. Error: $($_.Exception.Message)"
-                }
-            }
-        }
-    }
-    else {
-        Write-Error "Could not find winget.exe to install Winget-AutoUpdate."
-    }
-}
 Write-Host "`n========================================"
-
-
-
-######## End of Script ###########
-##################################
-##################################
-### Write to UDF if usrUDF (Write To) Number is defined. (Optional)
-if ($env:usrUDF -ge 1) {
-    if ($Global:varUDFString.length -gt 255) {
-        # Write UDF to diaglog
-        $Global:DiagMsg += " - Writing to UDF: " + $Global:varUDFString
-        # Limit UDF Entry to 255 Characters
-        Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString.substring(0, 255)) -Force
-    }
-    else {
-        # Write to diagLog and UDF
-        $Global:DiagMsg += " - Writing to UDF: " + $Global:varUDFString
-        Set-ItemProperty -Path "HKLM:\Software\CentraStage" -Name custom$env:usrUDF -Value $($varUDFString) -Force
-    }
-}
-### Info to be sent to into JSON POST to API Endpoint (Optional)
-$APIinfoHashTable = @{
-    'CS_PROFILE_UID' = $env:CS_PROFILE_UID
-    'Script_Diag'    = $Global:DiagMsg
-    'Script_UID'     = $ScriptUID
-}
-#######################################################################
-### Exit script with proper Datto diagnostic and API Results.
-# Add Script Result and POST to API if an Endpoint is Provided
-if ($null -ne $env:APIEndpoint) {
-    $Global:DiagMsg += " - Sending Results to API"
-    Invoke-WebRequest -Uri $env:APIEndpoint -Method POST -Body ($APIinfoHashTable | ConvertTo-Json) -ContentType "application/json"
-}
-# Exit with writing diagnostic back to the ticket / remediation component log
-write-DRMMDiag $Global:DiagMsg
-Exit 0
