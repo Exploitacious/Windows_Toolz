@@ -6,12 +6,18 @@ $ScriptName = "[Title from above]"
 $ScriptType = "Monitoring" # Or "Remediation", "General", etc.
 $Date = Get-Date -Format "MM/dd/yyyy hh:mm tt"
 
+## HARD-CODED VARIABLES ##
+# This section is for variables that are not meant to be configured via NinjaRMM script parameters.
+
+## ORG-LEVEL EXPECTED VARIABLES ##
+# This section is where we will list anything that will require 'Ninja-Property-Get' 
+
 ## CONFIG RMM VARIABLES ##
 # Create the following variables in your NinjaRMM script configuration:
 # customFieldName (Text): The name of the Text Custom Field to write the status to.
 
 # [Add other script-specific variables here, with type, description, and default if applicable]
-# Example: # uptimeThresholdDays (Integer): The maximum number of days... Default is 14.
+
 
 # What to Write if Alert is Healthy
 $Global:AlertHealthy = "System state is nominal. | Last Checked $Date"
@@ -54,8 +60,6 @@ try {
     # Main script logic goes here.
     # Populate $Global:AlertMsg if an issue is found.
     # Populate $Global:customFieldMessage with the status text.
-    
-    
     
     # Example:
     # $Global:customFieldMessage = "All checks passed successfully. ($Date)"
