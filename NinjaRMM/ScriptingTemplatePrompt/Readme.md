@@ -15,11 +15,11 @@ By giving an AI (like Gemini, ChatGPT, or Claude) a specialized "persona," we tu
 
 ### Step 1: Start a New AI Chat Session
 
-For the best results, **always start a new, fresh chat session** or create a "GPT / "Gemini GEM" with your chosen AI platform. This ensures the AI has a clean slate and isn't influenced by previous conversations.
+For the best results, **always start a new, fresh chat session** or create a **"Custom GPT / "Gemini GEM"** with your chosen AI platform. This ensures the AI has a clean slate and isn't influenced by previous conversations.
 
 ### Step 2: Load the "NinjaScript Architect" Persona
 
-Open the `AIPrompt.md` file. Select and copy the **entire contents** of the file. Paste this entire block of text as your **very first message** into the new chat window and send it.
+Open the `AIPrompt.md` file in RAW format (https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/refs/heads/main/NinjaRMM/ScriptingTemplatePrompt/AIPrompt.md) Select and copy the **entire contents** of the file. Paste this entire block of text as your **very first message** into the new chat window and send it.
 
 The AI will now have its instructions and is ready to act as your Ninja RMM scripting expert.
 
