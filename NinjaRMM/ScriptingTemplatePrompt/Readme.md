@@ -1,10 +1,10 @@
-# AI-Powered Ninja RMM Script Generator
+# Ninja RMM Script Generator
 
-## 1. Overview
+## 1. Welcome!
 
-Welcome! This toolkit is designed to help you generate high-quality, standardized PowerShell scripts for Ninja RMM using a powerful AI assistant.
+This toolkit is designed to generate high-quality, standardized scripts for Ninja RMM using a an AI assistant.
 
-By giving an AI (like Gemini, ChatGPT, or Claude) a specialized "persona," we can turn it into an expert script developer that understands all the specific rules and formats required for Ninja RMM scripting. This saves you time, reduces errors, and ensures all your scripts are consistent.
+By giving an AI (like Gemini, ChatGPT, or Claude) a specialized "persona," we turn it into a script developer that understands all the specific rules and formats required for Ninja RMM scripting. Simply use the prompt and request a script with human-language instructions.
 
 ## 2. What's Included
 
@@ -13,11 +13,9 @@ By giving an AI (like Gemini, ChatGPT, or Claude) a specialized "persona," we ca
 
 ## 3. How to Use
 
-Follow these three simple steps to start generating scripts.
-
 ### Step 1: Start a New AI Chat Session
 
-For the best results, **always start a new, fresh chat session** with your chosen AI platform (Gemini, ChatGPT, Claude, etc.). This ensures the AI has a clean slate and isn't influenced by previous conversations.
+For the best results, **always start a new, fresh chat session** or create a "GPT / "Gemini GEM" with your chosen AI platform. This ensures the AI has a clean slate and isn't influenced by previous conversations.
 
 ### Step 2: Load the "NinjaScript Architect" Persona
 
@@ -58,4 +56,3 @@ Here are a few examples of how you can ask for scripts:
 
 * **One Persona Per Chat:** Use your "NinjaScript Architect" chat session *only* for generating Ninja RMM scripts. If you need to ask the AI about something else, start a different chat.
 * **Review the Variables:** The AI will always list the RMM Script Variables you need to create at the top of the script. Double-check that you create these in the Ninja RMM policy.
-* **Iterate and Refine:** Don't be afraid to ask for changes. The AI is designed to modify and improve the scripts it creates.
