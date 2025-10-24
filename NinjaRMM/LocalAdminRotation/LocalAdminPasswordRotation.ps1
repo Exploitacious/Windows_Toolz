@@ -62,6 +62,19 @@ $Global:DiagMsg += "Executed On: $Date"
 ##################################
 ######## Start of Script #########
 
+function Test-IsDomainController {
+    # Get the computer system information
+    $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem
+
+    # A DomainRole of 4 or 5 indicates a Backup or Primary Domain Controller
+    if ($computerSystem.DomainRole -eq 4 -or $computerSystem.DomainRole -eq 5) {
+        return $true
+    }
+    else {
+        return $false
+    }
+}
+
 function New-LAPPassword {
     [CmdletBinding()]
     param (
@@ -100,102 +113,111 @@ function New-LAPPassword {
     return -join ($passwordChars | Get-Random -Count $passwordChars.Count)
 }
 
-try {
-    # Validate and cast RMM script parameters with sensible defaults.
-    $PasswordLength = if ($env:passwordLength) { [int]$env:passwordLength } else { 30 }
-    $PasswordCharSet = if ($env:passwordCharSet) { $env:passwordCharSet } else { 'ULNS' }
-    $Global:DiagMsg += "Password parameters: Length '$($PasswordLength)', CharSet '$($PasswordCharSet)'."
-    $Global:DiagMsg += "Hard-coded Azure AD exclusion domain: '$($MSPDomain)'."
+## Script Logic
 
-    # --- 1. Generate New Password ---
-    $Global:DiagMsg += "Generating new password for user '$($LocalAdminUsername)'."
-    $newPassword = New-LAPPassword -Length $PasswordLength -CharSet $PasswordCharSet
-    $newPasswordSecure = ConvertTo-SecureString -String $newPassword -AsPlainText -Force
-    $Global:DiagMsg += "Password generated successfully."
-
-    # --- 2. Create or Update the Local Admin User ---
-    $Global:DiagMsg += "Checking for local user '$($LocalAdminUsername)'."
+if (-not (Test-IsDomainController)) {
     try {
-        $localUser = Get-LocalUser -Name $LocalAdminUsername -ErrorAction Stop
-        $Global:DiagMsg += "User '$($LocalAdminUsername)' exists. Updating password."
-        Set-LocalUser -InputObject $localUser -Password $newPasswordSecure -PasswordNeverExpires $true
-        if (-not $localUser.Enabled) {
-            $Global:DiagMsg += "User '$($LocalAdminUsername)' is disabled. Enabling."
-            Enable-LocalUser -InputObject $localUser
-        }
-    }
-    catch [Microsoft.PowerShell.Commands.UserNotFoundException] {
-        $Global:DiagMsg += "User '$($LocalAdminUsername)' not found. Creating new user."
-        New-LocalUser -Name $LocalAdminUsername -Password $newPasswordSecure -FullName "Umbrella Local Admin" -Description "Managed local administrator account." -PasswordNeverExpires $true -ErrorAction Stop
-    }
-    
-    # --- 3. Ensure User is in Administrators Group ---
-    $Global:DiagMsg += "Ensuring '$($LocalAdminUsername)' is a member of the 'Administrators' group."
-    Add-LocalGroupMember -Group 'Administrators' -Member $LocalAdminUsername -ErrorAction SilentlyContinue
+        # Validate and cast RMM script parameters with sensible defaults.
+        $PasswordLength = if ($env:passwordLength) { [int]$env:passwordLength } else { 30 }
+        $PasswordCharSet = if ($env:passwordCharSet) { $env:passwordCharSet } else { 'ULNS' }
+        $Global:DiagMsg += "Password parameters: Length '$($PasswordLength)', CharSet '$($PasswordCharSet)'."
+        $Global:DiagMsg += "Hard-coded Azure AD exclusion domain: '$($MSPDomain)'."
 
-    # --- 4. Clean Up Administrators Group ---
-    $Global:DiagMsg += "Auditing 'Administrators' group membership."
-    $adminGroupMembers = Get-LocalGroupMember -Group 'Administrators'
-    foreach ($member in $adminGroupMembers) {
-        $memberName = $member.Name
-        # Define conditions to KEEP a user
-        $isProtectedUser = ($memberName -eq "BUILTIN\Administrators") -or ($memberName -like "*\$($LocalAdminUsername)")
-        $isMSPNETBIOSUser = ($memberName -like "$($MSPNETBIOSDomain)\*")
-        $isAzureADUser = ($memberName -like "AzureAD\*") -and ($memberName.Split('\')[1] -like "*@$($MSPDomain)")
-        $isUnresolvedSID = ($memberName -match '^S-\d-\d+-(\d+-){1,14}\d+$') # Regex to detect a SID
+        # --- 1. Generate New Password ---
+        $Global:DiagMsg += "Generating new password for user '$($LocalAdminUsername)'."
+        $newPassword = New-LAPPassword -Length $PasswordLength -CharSet $PasswordCharSet
+        $newPasswordSecure = ConvertTo-SecureString -String $newPassword -AsPlainText -Force
+        $Global:DiagMsg += "Password generated successfully."
 
-        if ($isProtectedUser) {
-            $Global:DiagMsg += "Keeping protected user: '$($memberName)'."
-            continue
-        }
-        if ($isMSPNETBIOSUser) {
-            $Global:DiagMsg += "Keeping MSP NetBIOS domain user: '$($memberName)'."
-            continue
-        }
-        if ($isAzureADUser) {
-            $Global:DiagMsg += "Keeping Azure AD user from specified domain: '$($memberName)'."
-            continue
-        }
-        if ($isUnresolvedSID) {
-            $Global:DiagMsg += "Keeping unresolved SID (likely an Azure AD Principal): '$($memberName)'."
-            continue
-        }
-
-        # If not protected by any rule, remove the user
-        $Global:DiagMsg += "Removing unauthorized user from Administrators group: '$($memberName)'."
+        # --- 2. Create or Update the Local Admin User ---
+        $Global:DiagMsg += "Checking for local user '$($LocalAdminUsername)'."
         try {
-            Remove-LocalGroupMember -Group 'Administrators' -Member $memberName -ErrorAction Stop
+            $localUser = Get-LocalUser -Name $LocalAdminUsername -ErrorAction Stop
+            $Global:DiagMsg += "User '$($LocalAdminUsername)' exists. Updating password."
+            Set-LocalUser -InputObject $localUser -Password $newPasswordSecure -PasswordNeverExpires $true
+            if (-not $localUser.Enabled) {
+                $Global:DiagMsg += "User '$($LocalAdminUsername)' is disabled. Enabling."
+                Enable-LocalUser -InputObject $localUser
+            }
         }
-        catch {
-            $Global:DiagMsg += "Warning: Could not remove '$($memberName)'. Manual review may be needed. Error: $($_.Exception.Message)"
+        catch [Microsoft.PowerShell.Commands.UserNotFoundException] {
+            $Global:DiagMsg += "User '$($LocalAdminUsername)' not found. Creating new user."
+            New-LocalUser -Name $LocalAdminUsername -Password $newPasswordSecure -FullName "Umbrella Local Admin" -Description "Managed local administrator account." -PasswordNeverExpires $true -ErrorAction Stop
         }
-    }
-
-    # --- 5. Disable Default Accounts ---
-    $Global:DiagMsg += "Ensuring default accounts are disabled: $($AccountsToDisable -join ', ')."
-    foreach ($account in $AccountsToDisable) {
-        try {
-            # Added -ErrorAction Stop to Get-LocalUser to properly trigger the catch block if the user doesn't exist.
-            Get-LocalUser -Name $account -ErrorAction Stop | Disable-LocalUser
-            $Global:DiagMsg += "Account '$($account)' confirmed disabled."
-        }
-        catch {
-            $Global:DiagMsg += "Info: Could not disable account '$($account)' as it was not found."
-        }
-    }
-    # --- 7. Prepare Custom Field Data ---
-    $statusMessage = "$($LocalAdminUsername) | $Date"
-    $Global:DiagMsg += "Data prepared for NinjaRMM Custom Fields."
     
-    # --- 8. Set Ninja RMM Custom Fields ---
-    $Global:DiagMsg += "Updating NinjaRMM Custom Fields..."
-    Ninja-Property-Set -Name $AdminPassCustomField -Value $newPassword
-    Ninja-Property-Set -Name $AdminNameCustomField -Value $statusMessage
-    $Global:DiagMsg += "Successfully set Custom Fields '$($AdminNameCustomField)' and '$($AdminPassCustomField)'."
+        # --- 3. Ensure User is in Administrators Group ---
+        $Global:DiagMsg += "Ensuring '$($LocalAdminUsername)' is a member of the 'Administrators' group."
+        Add-LocalGroupMember -Group 'Administrators' -Member $LocalAdminUsername -ErrorAction SilentlyContinue
+
+        # --- 4. Clean Up Administrators Group ---
+        $Global:DiagMsg += "Auditing 'Administrators' group membership."
+        $adminGroupMembers = Get-LocalGroupMember -Group 'Administrators'
+        foreach ($member in $adminGroupMembers) {
+            $memberName = $member.Name
+            # Define conditions to KEEP a user
+            $isProtectedUser = ($memberName -eq "BUILTIN\Administrators") -or ($memberName -like "*\$($LocalAdminUsername)")
+            $isMSPNETBIOSUser = ($memberName -like "$($MSPNETBIOSDomain)\*")
+            $isAzureADUser = ($memberName -like "AzureAD\*") -and ($memberName.Split('\')[1] -like "*@$($MSPDomain)")
+            $isUnresolvedSID = ($memberName -match '^S-\d-\d+-(\d+-){1,14}\d+$') # Regex to detect a SID
+
+            if ($isProtectedUser) {
+                $Global:DiagMsg += "Keeping protected user: '$($memberName)'."
+                continue
+            }
+            if ($isMSPNETBIOSUser) {
+                $Global:DiagMsg += "Keeping MSP NetBIOS domain user: '$($memberName)'."
+                continue
+            }
+            if ($isAzureADUser) {
+                $Global:DiagMsg += "Keeping Azure AD user from specified domain: '$($memberName)'."
+                continue
+            }
+            if ($isUnresolvedSID) {
+                $Global:DiagMsg += "Keeping unresolved SID (likely an Azure AD Principal): '$($memberName)'."
+                continue
+            }
+
+            # If not protected by any rule, remove the user
+            $Global:DiagMsg += "Removing unauthorized user from Administrators group: '$($memberName)'."
+            try {
+                Remove-LocalGroupMember -Group 'Administrators' -Member $memberName -ErrorAction Stop
+            }
+            catch {
+                $Global:DiagMsg += "Warning: Could not remove '$($memberName)'. Manual review may be needed. Error: $($_.Exception.Message)"
+            }
+        }
+
+        # --- 5. Disable Default Accounts ---
+        $Global:DiagMsg += "Ensuring default accounts are disabled: $($AccountsToDisable -join ', ')."
+        foreach ($account in $AccountsToDisable) {
+            try {
+                # Added -ErrorAction Stop to Get-LocalUser to properly trigger the catch block if the user doesn't exist.
+                Get-LocalUser -Name $account -ErrorAction Stop | Disable-LocalUser
+                $Global:DiagMsg += "Account '$($account)' confirmed disabled."
+            }
+            catch {
+                $Global:DiagMsg += "Info: Could not disable account '$($account)' as it was not found."
+            }
+        }
+        # --- 7. Prepare Custom Field Data ---
+        $statusMessage = "$($LocalAdminUsername) | $Date"
+        $Global:DiagMsg += "Data prepared for NinjaRMM Custom Fields."
+    
+        # --- 8. Set Ninja RMM Custom Fields ---
+        $Global:DiagMsg += "Updating NinjaRMM Custom Fields..."
+        Ninja-Property-Set -Name $AdminPassCustomField -Value $newPassword
+        Ninja-Property-Set -Name $AdminNameCustomField -Value $statusMessage
+        $Global:DiagMsg += "Successfully set Custom Fields '$($AdminNameCustomField)' and '$($AdminPassCustomField)'."
+    }
+    catch {
+        $Global:DiagMsg += "An unexpected error occurred: $($_.Exception.Message)"
+        $Global:AlertMsg = "Script failed with an unexpected error. See diagnostics for details. | Last Checked $Date"
+    }
 }
-catch {
-    $Global:DiagMsg += "An unexpected error occurred: $($_.Exception.Message)"
-    $Global:AlertMsg = "Script failed with an unexpected error. See diagnostics for details. | Last Checked $Date"
+else {
+    # If the result is TRUE (it is a DC), write a message and move on.
+    $Global:DiagMsg += "This computer is a domain controller. Skipping password rotation."
+    $Global:AlertHealthy = "This computer is a domain controller. Password rotation has been skipped. | Last Checked $Date"
 }
 
 ######## End of Script ###########

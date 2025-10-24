@@ -127,12 +127,6 @@ Function Perform-SystemLevelActions {
     foreach ($task in $tasksToDisable) {
         Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue | Disable-ScheduledTask
     }
-
-    # --- Remove Edge shortcut from Public Desktop ---
-    $edgeShortcut = Join-Path $env:PUBLIC "Desktop\Microsoft Edge.lnk"
-    if (Test-Path $edgeShortcut) {
-        Remove-Item $edgeShortcut -Force
-    }
 }
 
 Function Apply-AllUserTweaks {
