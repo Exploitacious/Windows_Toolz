@@ -1,0 +1,32 @@
+{
+    "Rules": [
+        {
+            "SettingName": "NinjaRMMInstalled",
+            "Operator": "IsEquals",
+            "DataType": "Boolean",
+            "Operand": true,
+            "MoreInfoUrl": "https://portal.umbrellaitgroup.com/",
+            "RemediationStrings": [
+                {
+                    "Language": "en_US",
+                    "Title": "NinjaRMM Agent is not installed.",
+                    "Description": "Please install the NinjaRMM agent to ensure your device is compliant. You can find the installer inside the Company Portal App. For help, click the link to submit a ticket to Umbrella."
+                }
+            ]
+        },
+        {
+            "SettingName": "NinjaRMMRunning",
+            "Operator": "IsEquals",
+            "DataType": "Boolean",
+            "Operand": true,
+            "MoreInfoUrl": "https://portal.umbrellaitgroup.com/",
+            "RemediationStrings": [
+                {
+                    "Language": "en_US",
+                    "Title": "NinjaRMM Agent Service is not running.",
+                    "Description": "Please restart your computer to ensure your device is compliant. For help, click the link to submit a ticket to Umbrella."
+                }
+            ]
+        }
+    ]
+}

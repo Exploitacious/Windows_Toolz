@@ -65,27 +65,85 @@ try {
     $Global:DiagMsg += "[CONFIG] Specific App IDs to Refresh: $($specificAppIDsToRefresh -join ', ')"
 
     # --- Helper Functions ---
-    function Test-IntuneEnrollment {
-        $imeRegistryPath = "HKLM:\SOFTWARE\Microsoft\IntuneManagementExtension\EnrolledAadDeviceId"
-        try { if (Get-ItemProperty -Path $imeRegistryPath -Name "EnrolledAadDeviceId" -ErrorAction Stop) { return $true } } catch {}
-        return $false
-    }
-
-    function Get-ImeUserDetails {
-        $win32AppsPath = "HKLM:\SOFTWARE\Microsoft\IntuneManagementExtension\Win32Apps"
-        $userKey = Get-ChildItem -Path $win32AppsPath |
-        Where-Object { $_.PSChildName -match '^[a-f0-9]{8}-([a-f0-9]{4}-){3}[a-f0-9]{12}$' } |
-        Sort-Object LastWriteTime -Descending |
-        Select-Object -First 1
-
-        if ($userKey) {
-            return $userKey.PSChildName
+    function Get-DeviceAndUserState {
+        <#
+    .SYNOPSIS
+        Checks the device's Azure AD join state and finds the Intune Management Extension user profile.
+    .DESCRIPTION
+        This function executes 'dsregcmd /status' to determine if the device is Azure AD Joined or Hybrid Joined.
+        It also locates the most recently used user profile GUID from the Intune Management Extension registry path,
+        which is required for Win32 app operations.
+    .OUTPUTS
+        A PSCustomObject with the following properties:
+        - IsIntuneManaged (Boolean): $true if AzureAdJoined is YES.
+        - JoinState (String): A descriptive string like "Hybrid Azure AD Joined", "Azure AD Joined", "Domain Joined", or "Workgroup".
+        - TenantName (String): The name of the Azure tenant, if available.
+        - UserObjectID (String): The GUID of the user profile from the IME registry, if found.
+    #>
+        $Global:DiagMsg += "Running device and user state analysis..."
+        $output = [PSCustomObject]@{
+            IsIntuneManaged = $false
+            JoinState       = "Unknown"
+            TenantName      = $null
+            UserObjectID    = $null
         }
-        $Global:DiagMsg += "[WARNING] No user profiles found under the Win32Apps registry key."
-        return $null
-    }
+
+        try {
+            # Part 1: Get Device Join State using dsregcmd
+            $dsregOutput = (dsregcmd /status)
+            if ([string]::IsNullOrWhiteSpace($dsregOutput)) {
+                throw "dsregcmd /status returned no output. Cannot determine join state."
+            }
+
+            $isAzureAdJoined = $dsregOutput -match "AzureAdJoined\s+:\s+YES"
+            $isDomainJoined = $dsregOutput -match "DomainJoined\s+:\s+YES"
+
+            if ($isAzureAdJoined) {
+                $output.IsIntuneManaged = $true
+                $output.JoinState = if ($isDomainJoined) { "Hybrid Azure AD Joined" } else { "Azure AD Joined" }
+            
+                # Safely check for a TenantName match before trying to access the result.
+                $tenantMatch = $dsregOutput | Select-String -Pattern "TenantName\s+:\s+(.*)"
+                if ($tenantMatch) {
+                    $output.TenantName = $tenantMatch.Matches.Groups[1].Value.Trim()
+                }
+            }
+            elseif ($isDomainJoined) {
+                $output.JoinState = "Domain Joined"
+            }
+            else {
+                $output.JoinState = "Workgroup"
+            }
+            $Global:DiagMsg += "[INFO] Device Join State determined as: $($output.JoinState)."
+            if ($output.TenantName) { $Global:DiagMsg += "[INFO] Tenant Name: $($output.TenantName)." }
+
+            # Part 2: Get the IME User Object ID
+            $win32AppsPath = "HKLM:\SOFTWARE\Microsoft\IntuneManagementExtension\Win32Apps"
+            $userKey = Get-ChildItem -Path $win32AppsPath -ErrorAction SilentlyContinue |
+            Where-Object { $_.PSChildName -match '^[a-f0-9]{8}-([a-f0-9]{4}-){3}[a-f0-9]{12}$' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+            if ($userKey) {
+                $output.UserObjectID = $userKey.PSChildName
+                $Global:DiagMsg += "[INFO] Found Intune user profile: $($output.UserObjectID)."
+            }
+            else {
+                $Global:DiagMsg += "[WARNING] No user profiles found under the Win32Apps registry key. App refresh may fail."
+            }
+
+        }
+        catch {
+            $Global:DiagMsg += "[ERROR] Failed to get device and user state: $($_.Exception.Message)"
+            # CRITICAL FIX: On any failure, explicitly reset to a known-bad state.
+            $output.IsIntuneManaged = $false
+            $output.JoinState = "State Check Failed"
+        }
     
+        return $output
+    }    
     #endregion --- Configuration & Helper Functions ---
+
 
     #region --- Core Action Functions ---
 
@@ -115,14 +173,17 @@ try {
     }
 
     function Invoke-Win32AppRefresh {
+        param(
+            [string]$UserObjectID
+        )
+
         $Global:DiagMsg += "[ACTION] Running Win32 App Refresh..."
-        $userObjectID = Get-ImeUserDetails
-        if (!$userObjectID) { 
-            $Global:DiagMsg += "[ERROR] Could not determine user object ID from IME registry. Cannot proceed with app refresh."
-            return 
+        if (-not $UserObjectID) {
+            $Global:DiagMsg += "[ERROR] User Object ID was not provided. Cannot proceed with app refresh."
+            return
         }
 
-        $basePath = "HKLM:\SOFTWARE\Microsoft\IntuneManagementExtension\Win32Apps\$userObjectID"
+        $basePath = "HKLM:\SOFTWARE\Microsoft\IntuneManagementExtension\Win32Apps\$UserObjectID"
         
         # Logic for SPECIFIC apps
         if ($specificAppIDsToRefresh.Count -gt 0) {
@@ -177,36 +238,40 @@ try {
     #region --- Script Entry Point ---
 
     $actionsTaken = @()
+    $finalStatusInfo = ""
 
-    # Pre-flight check for Intune Enrollment
-    if (-NOT (Test-IntuneEnrollment)) {
-        $Global:AlertMsg = "Device is not enrolled in Intune. No actions taken. | Last Checked $Date"
-        $Global:customFieldMessage = "Failed: Device not enrolled in Intune. ($Date)"
+    # Pre-flight check for Intune Enrollment and User State
+    $deviceState = Get-DeviceAndUserState
+
+    if (-NOT $deviceState.IsIntuneManaged) {
+        $alertMessage = "Device not managed by Intune (State: $($deviceState.JoinState)). No actions taken."
+        $Global:AlertMsg = "$alertMessage | Last Checked $Date"
+        $Global:customFieldMessage = "Failed: $alertMessage ($Date)"
     }
     else {
-        $Global:DiagMsg += "[INFO] Device appears to be enrolled in Intune. Proceeding with actions."
-        
+        $Global:DiagMsg += "[INFO] Device is Intune managed. Proceeding with actions."
+        $finalStatusInfo = "(State: $($deviceState.JoinState)"
+        if ($deviceState.TenantName) { $finalStatusInfo += ", Tenant: $($deviceState.TenantName)" }
+        $finalStatusInfo += ")"
+
         if ($runPolicyRefresh) {
             Invoke-IntunePolicyRefresh
             $actionsTaken += "Policy Sync"
         }
 
         if ($runAppRefresh) {
-            Invoke-Win32AppRefresh
-            if ($specificAppIDsToRefresh.Count -gt 0) {
-                $actionsTaken += "App Refresh (Specific)"
-            }
-            else {
-                $actionsTaken += "App Refresh (All)"
-            }
+            # Pass the discovered UserObjectID to the function
+            Invoke-Win32AppRefresh -UserObjectID $deviceState.UserObjectID
+            $action = if ($specificAppIDsToRefresh.Count -gt 0) { "App Refresh (Specific)" } else { "App Refresh (All)" }
+            $actionsTaken += $action
         }
 
         if ($actionsTaken.Count -eq 0) {
-            $Global:customFieldMessage = "No actions were selected to run. ($Date)"
+            $Global:customFieldMessage = "No actions were selected to run. $finalStatusInfo ($Date)"
             $Global:DiagMsg += "No actions selected in RMM variables. Script completed without changes."
         }
         else {
-            $Global:customFieldMessage = "Actions initiated: $($actionsTaken -join ', '). ($Date)"
+            $Global:customFieldMessage = "Actions initiated: $($actionsTaken -join ', '). $finalStatusInfo ($Date)"
         }
     }
     

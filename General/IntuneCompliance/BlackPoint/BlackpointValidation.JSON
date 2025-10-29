@@ -1,0 +1,32 @@
+{
+    "Rules": [
+        {
+            "SettingName": "BlackpointInstalled",
+            "Operator": "IsEquals",
+            "DataType": "Boolean",
+            "Operand": true,
+            "MoreInfoUrl": "https://portal.umbrellaitgroup.com/",
+            "RemediationStrings": [
+                {
+                    "Language": "en_US",
+                    "Title": "Blackpoint Agent is not installed.",
+                    "Description": "Please install the Blackpoint agent to ensure your device is compliant. You can find the installer inside Company Portal."
+                }
+            ]
+        },
+        {
+            "SettingName": "BlackpointRunning",
+            "Operator": "IsEquals",
+            "DataType": "Boolean",
+            "Operand": true,
+            "MoreInfoUrl": "https://portal.umbrellaitgroup.com/",
+            "RemediationStrings": [
+                {
+                    "Language": "en_US",
+                    "Title": "Blackpoint Agent Service is not running.",
+                    "Description": "Please restart the Blackpoint Agent service to ensure your device is compliant."
+                }
+            ]
+        }
+    ]
+}

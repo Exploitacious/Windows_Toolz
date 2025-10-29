@@ -1,0 +1,32 @@
+{
+    "Rules": [
+        {
+            "SettingName": "NodewareInstalled",
+            "Operator": "IsEquals",
+            "DataType": "Boolean",
+            "Operand": true,
+            "MoreInfoUrl": "https://portal.umbrellaitgroup.com/",
+            "RemediationStrings": [
+                {
+                    "Language": "en_US",
+                    "Title": "Nodeware Agent is not installed.",
+                    "Description": "Please install the Nodeware agent to ensure your device is compliant. You can find the installer inside Company Portal."
+                }
+            ]
+        },
+        {
+            "SettingName": "NodewareRunning",
+            "Operator": "IsEquals",
+            "DataType": "Boolean",
+            "Operand": true,
+            "MoreInfoUrl": "https://portal.umbrellaitgroup.com/",
+            "RemediationStrings": [
+                {
+                    "Language": "en_US",
+                    "Title": "Nodeware Agent Service is not running.",
+                    "Description": "Please restart the Nodeware Agent service to ensure your device is compliant."
+                }
+            ]
+        }
+    ]
+}
