@@ -6,23 +6,16 @@ $ScriptName = "Device Decommissioning and Secure Wipe"
 $ScriptType = "Remediation" # This script performs a destructive action.
 $Date = Get-Date -Format "MM/dd/yyyy hh:mm tt"
 
-## HARD-CODED VARIABLES ##
-# This section is for variables that are not meant to be configured via NinjaRMM script parameters.
+## HARD-CODED VARIABLES ### This section is for variables that are not meant to be configured via NinjaRMM script parameters.
 $finalKeyCustomField = 'decomFinalKey'
 $orgBitlockerCF = 'bitlockerDecryptionKey'
 $tempDir = 'C:\Temp\NinjaDecommission'
 $env:customFieldName = "decomDeviceInfo"
 
-## ORG-LEVEL EXPECTED VARIABLES ##
-# This script expects an Organization-level Custom Field to check against the current BitLocker key.
-
-## CONFIG RMM VARIABLES ##
-# Create the following variables in your NinjaRMM script configuration:
-# customFieldName (Text): The name of the Text Custom Field to write the final status to.
-# decommissionMode (Dropdown: SecureWipe,QuickDisable): The decommissioning method to use. 'SecureWipe' is a lengthy, forensic data wipe. 'QuickDisable' is a fast method to make a device unbootable. Default: SecureWipe.
+## CONFIG RMM VARIABLES ### Create the following variables in your NinjaRMM script configuration:
+# corruptBootloader (Checkbox): If checked, will also corrupt the bootloader (BCD) to make the device unbootable. Default: false.
+# finalAction (Dropdown: SecureWipe,Reboot): The final action to take. 'SecureWipe' launches SDelete. 'Reboot' finalizes the Quick Disable. Default: Reboot.
 # sdeletePasses (Number): For SecureWipe mode, the number of overwrite passes for SDelete. Default: 1.
-# rebootAfterwards (Checkbox): Reboot or shut down the machine after the operation is complete. Default: true.
-
 
 # What to Write if Alert is Healthy
 $Global:AlertHealthy = "Decommissioning script completed its task successfully. | Last Checked $Date"
@@ -197,23 +190,12 @@ function Handle-BitLockerPrerequisites {
     $Global:DiagMsg += "--- Finished BitLocker Prerequisite Check ---"
 }
 
-function Invoke-QuickDisable {
-    $Global:DiagMsg += "--- Starting Quick Disable Process ---"
-
-    $Global:DiagMsg += "Clearing Credential Manager..."
-    try {
-        $Global:DiagMsg += "INFO: Clearing cached credentials from Credential Manager..."
-        cmdkey /list | ForEach-Object {
-            # Find lines that contain a target and extract the target name.
-            if ($_ -match '^\s*Target:\s*(.*)$') {
-                $target = $Matches[1]
-                cmdkey /delete:$target
-            }
-        }
-    }
-    catch {
-        $Global:DiagMsg += "Failed to clear credential manager: $($_.Exception.Message). This may not prevent boot."
-    }
+function Invoke-CorruptBootloader {
+    <#
+    .SYNOPSIS
+        Aggressively corrupts the Boot Configuration Data (BCD) to make the OS unbootable.
+    #>
+    $Global:DiagMsg += "--- Starting Bootloader Corruption ---"
     
     # Corrupt the Boot Configuration Data (BCD) with multiple commands
     $Global:DiagMsg += "Corrupting the Windows Bootloader (BCD) by deleting key entries..."
@@ -236,7 +218,27 @@ function Invoke-QuickDisable {
         # This will only catch a catastrophic failure of bcdedit itself.
         $Global:DiagMsg += "A critical error occurred while running bcdedit: $($_.Exception.Message)"
     }
+    $Global:DiagMsg += "--- Bootloader Corruption Complete ---"
+}
 
+function Invoke-QuickDisable {
+    $Global:DiagMsg += "--- Starting Quick Disable Process ---"
+
+    $Global:DiagMsg += "Clearing Credential Manager..."
+    try {
+        $Global:DiagMsg += "INFO: Clearing cached credentials from Credential Manager..."
+        cmdkey /list | ForEach-Object {
+            # Find lines that contain a target and extract the target name.
+            if ($_ -match '^\s*Target:\s*(.*)$') {
+                $target = $Matches[1]
+                cmdkey /delete:$target
+            }
+        }
+    }
+    catch {
+        $Global:DiagMsg += "Failed to clear credential manager: $($_.Exception.Message). This may not prevent boot."
+    }
+    
     $Global:DiagMsg += "Removing non-recovery key protectors."
     try {
         $AllProtectors = (Get-BitLockerVolume -MountPoint $env:SystemDrive).KeyProtector
@@ -252,8 +254,36 @@ function Invoke-QuickDisable {
         $Global:DiagMsg += "WARNING: An error occurred while removing key protectors. $_"
     }
 
+    $Global:DiagMsg += "Forcing BitLocker recovery mode on all protected volumes..."
+    try {
+        # Find all volumes where BitLocker is currently 'On'
+        $protectedVolumes = Get-BitLockerVolume | Where-Object { $_.ProtectionStatus -eq 'On' }
+        
+        if (-not $protectedVolumes) {
+            $Global:DiagMsg += "No BitLocker-protected volumes found. Skipping -ForceRecovery."
+        }
+        else {
+            $Global:DiagMsg += "Found protected volumes: $($protectedVolumes.MountPoint -join ', ')"
+            foreach ($volume in $protectedVolumes) {
+                $mountPoint = $volume.MountPoint
+                $Global:DiagMsg += "Attempting to force recovery for volume: $mountPoint"
+                
+                # Execute manage-bde.exe. This command removes all TPM-related protectors
+                # from the volume, forcing a recovery key prompt on next access/boot.
+                manage-bde.exe -fr $mountPoint
+                
+                $Global:DiagMsg += "Successfully executed manage-bde -fr on $mountPoint."
+            }
+        }
+    }
+    catch {
+        # This will catch errors from Get-BitLockerVolume or if manage-bde.exe fails
+        $Global:DiagMsg += "WARNING: An error occurred while forcing BitLocker recovery: $($_.Exception.Message)"
+    }
+
     $Global:DiagMsg += "Resetting the TPM. This will clear TPM keys."
     try {
+        Clear-Tpm
         Clear-Tpm -UsePPI
         $Global:DiagMsg += "TPM reset command issued successfully."
     }
@@ -342,21 +372,24 @@ function Invoke-SecureWipe {
 
 try {
     # Validate and cast RMM parameters
-    $decommissionMode = $env:decommissionMode
-    if (-not ($decommissionMode -in @('QuickDisable', 'SecureWipe'))) {
-        throw "Invalid decommissionMode specified: '$decommissionMode'. Must be 'QuickDisable' or 'SecureWipe'."
+    $corruptBootloader = $false
+    if ($env:corruptBootloader -eq 'true') {
+        try { $corruptBootloader = [bool]$env:corruptBootloader }
+        catch { throw "Could not convert corruptBootloader '$($env:corruptBootloader)' to a boolean." }
     }
+    
+    $finalAction = $env:finalAction
+    if (-not ($finalAction -in @('SecureWipe', 'Reboot'))) {
+        $Global:DiagMsg += "Invalid finalAction '$finalAction' specified. Defaulting to 'Reboot'."
+        $finalAction = 'Reboot'
+    }
+
     $sdeletePasses = 1
     if ($env:sdeletePasses) {
         try { $sdeletePasses = [int]$env:sdeletePasses }
         catch { throw "Could not convert sdeletePasses '$($env:sdeletePasses)' to an integer." }
     }
-    $rebootAfterwards = $true
-    if ($env:rebootAfterwards) {
-        try { $rebootAfterwards = [bool]$env:rebootAfterwards }
-        catch { throw "Could not convert rebootAfterwards '$($env:rebootAfterwards)' to a boolean." }
-    }
-    $Global:DiagMsg += "Mode: $decommissionMode, SDelete Passes: $sdeletePasses, Reboot: $rebootAfterwards"
+    $Global:DiagMsg += "Corrupt Bootloader: $corruptBootloader, Final Action: $finalAction, SDelete Passes: $sdeletePasses"
 
     # Disable Power Options and Sleep
     Invoke-MaximumPerformanceMode
@@ -364,40 +397,29 @@ try {
     # Handle BitLocker key backup
     Handle-BitLockerPrerequisites
 
-    # Execute the chosen decommission mode
-    if ($decommissionMode -eq 'QuickDisable') {
-        Invoke-QuickDisable
-        $Global:customFieldMessage = "Quick Disable completed successfully. Bootloader corrupted and TPM cleared. ($Date)"
+    # Step 1: Run the base "Quick Disable" (remove keys, clear TPM)
+    Invoke-QuickDisable
 
-        if ($rebootAfterwards) {
-            $Global:DiagMsg += "Final destructive action complete. Rebooting machine..."
-            Shutdown.exe -r -t 15
-        }
-        else {
-            $Global:DiagMsg += "Final destructive action complete. Shutdown skipped as per configuration."
-        }
-    } 
-    
-    if ($decommissionMode -eq 'SecureWipe') {
-        # First, run the full secure wipe process.
-        Invoke-SecureWipe -Passes $sdeletePasses
-        
-        # Next, run the quick disable process to corrupt the bootloader and TPM.
-        $Global:DiagMsg += "S-Delete Secure Wipe verified. Proceeding with disablement actions."
-        Invoke-QuickDisable
-
-        # Update the final status message to reflect that both actions were taken.
-        $Global:customFieldMessage = "Combined Secure Wipe and disablement actions successfully launched. ($Date)"
-
-        if ($rebootAfterwards) {
-            $Global:DiagMsg += "Please allow time for the machine to securely erase all data."
-            $Global:DiagMsg += "If you would like this computer to quickly reboot and be disabled, please run this script again in 'Quick Disable' mode."
-        }
-        else {
-            $Global:DiagMsg += "Final destructive actions launched. Please allow time for the machine to securely erase all data."
-        }
+    # Step 2: Optionally corrupt the bootloader if the checkbox is ticked
+    if ($corruptBootloader) {
+        Invoke-CorruptBootloader
+    }
+    else {
+        $Global:DiagMsg += "Skipping bootloader corruption as per configuration."
     }
 
+    # Step 3: Execute the chosen final action
+    if ($finalAction -eq 'SecureWipe') {
+        $Global:DiagMsg += "Final Action: Secure Wipe. Launching SDelete..."
+        Invoke-SecureWipe -Passes $sdeletePasses
+        $Global:customFieldMessage = "Quick Disable complete. SDelete wipe ($($sdeletePasses) passes) has been launched. ($Date)"
+    }
+    elseif ($finalAction -eq 'Reboot') {
+        $Global:DiagMsg += "Final Action: Reboot. Rebooting machine to finalize disablement..."
+        $Global:customFieldMessage = "Quick Disable complete. Device is rebooting to finalize. ($Date)"
+        Shutdown.exe -r -t 10
+    }
+    
 }
 catch {
     $Global:DiagMsg += "An unexpected error occurred: $($_.Exception.Message)"
