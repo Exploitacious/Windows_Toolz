@@ -131,8 +131,8 @@ function Handle-BitLockerPrerequisites {
     .DESCRIPTION
         This function uses the robust Get-BitLockerVolume cmdlet to check the C: drive.
         - If encrypted, it grabs the current recovery key and saves it to the 'decomFinalKey' custom field.
-        - If not encrypted, it enables BitLocker using the TPM, then saves the new key.
-        This is a critical prerequisite to ensure data can be recovered if the decommission is halted, while guaranteeing the device is secure before wiping.
+        - If not encrypted, it attempts to enable BitLocker using the TPM.
+        - If enabling fails (e.g., no TPM), it throws a terminating error to be caught by the main script.
     #>
     $Global:DiagMsg += "--- Starting BitLocker Prerequisite Check (v2) ---"
     Get-TpmAuditInfo | Out-Null # Run the TPM audit and add its output to the diagnostics
@@ -164,7 +164,9 @@ function Handle-BitLockerPrerequisites {
             $Global:DiagMsg += "Attempting to enable BitLocker on $mountPoint..."
             
             # Use the most compatible settings for automated enablement.
-            Enable-BitLocker -MountPoint $mountPoint -TpmProtector -EncryptionMethod Aes256
+            # CRITICAL FIX: Added -ErrorAction Stop to force a terminating error on TPM failure.
+            Enable-BitLocker -MountPoint $mountPoint -TpmProtector -EncryptionMethod Aes256 -ErrorAction Stop
+            
             $Global:DiagMsg += "Waiting for encryption process to generate key..."
             Start-Sleep -Seconds 20
             
@@ -179,12 +181,13 @@ function Handle-BitLockerPrerequisites {
                 $Global:DiagMsg += "Successfully backed up new recovery key."
             }
             else {
+                # This 'throw' should now only be reachable if BitLocker enabled but somehow failed to make a key.
                 throw "Enabled BitLocker on $mountPoint, but failed to retrieve the new recovery key."
             }
         }
     }
     catch {
-        # This will catch errors from Get-BitLockerVolume or any other part of the process
+        # This will catch errors from Get-BitLockerVolume OR the terminating error from Enable-BitLocker
         throw "A critical error occurred during BitLocker prerequisite handling for $mountPoint : $($_.Exception.Message)"
     }
     $Global:DiagMsg += "--- Finished BitLocker Prerequisite Check ---"
@@ -394,10 +397,12 @@ try {
     # Disable Power Options and Sleep
     Invoke-MaximumPerformanceMode
 
-    # Handle BitLocker key backup
+    # --- Standard Decommission Path ---
+    
+    # Handle BitLocker key backup. This will throw an error if TPM is missing and BitLocker is off.
     Handle-BitLockerPrerequisites
 
-    # Step 1: Run the base "Quick Disable" (remove keys, clear TPM)
+    # Step 1: Run the base "Quick Disable" (remove keys)
     Invoke-QuickDisable
 
     # Step 2: Optionally corrupt the bootloader if the checkbox is ticked
@@ -417,14 +422,45 @@ try {
     elseif ($finalAction -eq 'Reboot') {
         $Global:DiagMsg += "Final Action: Reboot. Rebooting machine to finalize disablement..."
         $Global:customFieldMessage = "Quick Disable complete. Device is rebooting to finalize. ($Date)"
-        Shutdown.exe -r -t 10
+        Shutdown.exe -r -t 15
     }
     
 }
 catch {
-    $Global:DiagMsg += "An unexpected error occurred: $($_.Exception.Message)"
-    $Global:AlertMsg = "Script failed with an unexpected error. DESTRUCTIVE ACTIONS MAY HAVE FAILED. | Last Checked $Date"
-    $Global:customFieldMessage = "Script failed with an error. ($Date)"
+    # --- Emergency Decommission Path ---
+    $errorMessage = $_.Exception.Message
+    $Global:DiagMsg += "An error occurred during the standard path: $errorMessage"
+
+    # Check for the specific TPM failure (HRESULT 0x8028400F or string match)
+    if ($errorMessage -match '0x8028400F' -or $errorMessage -match 'Trusted Platform Module') {
+        $Global:DiagMsg += "--- TPM Failure Detected ---"
+        $Global:DiagMsg += "Device is unsecurable. Jumping directly to emergency decommission."
+        
+        try {
+            # Run the destructive actions immediately
+            Invoke-QuickDisable
+            Invoke-CorruptBootloader
+            
+            # Set a "success" message for this alternate path
+            $Global:customFieldMessage = "TPM not found. Device unencrypted. Emergency BCD corruption and Quick Disable completed. ($Date)"
+            # Override the healthy alert to reflect this specific path
+            $Global:AlertHealthy = "Decommission (TPM-Fail-Path) completed successfully. Device bricked. | Last Checked $Date"
+            # Clear any alert message that would be set by the outer catch
+            $Global:AlertMsg = @() 
+        }
+        catch {
+            # Catch errors from the emergency actions themselves
+            $Global:DiagMsg += "CRITICAL: Emergency decommission actions failed: $($_.Exception.Message)"
+            $Global:AlertMsg = "TPM failure occurred, but emergency decommission FAILED. | Last Checked $Date"
+            $Global:customFieldMessage = "Script failed during emergency BCD corruption. ($Date)"
+        }
+    }
+    else {
+        # This is for any other unexpected error
+        $Global:DiagMsg += "An unexpected error (not TPM-related) occurred."
+        $Global:AlertMsg = "Script failed with an unexpected error. See diagnostics. | Last Checked $Date"
+        $Global:customFieldMessage = "Script failed with an unexpected error. ($Date)"
+    }
 }
 
 

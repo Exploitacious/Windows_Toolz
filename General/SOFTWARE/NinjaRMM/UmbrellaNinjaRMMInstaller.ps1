@@ -27,7 +27,7 @@ $msiUrl = ""
 $tempDirectory = $env:TEMP
 
 # The name for the downloaded MSI file.
-$msiFileName = "NinjaOne-Agent.msi"
+$msiFileName = "Installer.msi"
 
 # The name for the installation log file.
 $logFileName = "Msi-Install-Log.log"
