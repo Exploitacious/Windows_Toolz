@@ -173,8 +173,7 @@ function Invoke-BitdefenderUninstallTool {
     $Global:DiagMsg += " - BEST Uninstall Tool Command: `"$toolPath`" $($arguments -join ' ')"
     
     try {
-        $process = Start-Process -FilePath $toolPath -ArgumentList $arguments -Wait -PassThru -NoNewWindow -RedirectStandardOutput $StdOutLogPath -RedirectStandardError $StdErrLogPath -ErrorAction Stop
-
+        $process = Start-Process -FilePath $toolPath -ArgumentList $arguments -WorkingDirectory $BdTempDir -Wait -PassThru -NoNewWindow -RedirectStandardOutput $StdOutLogPath -RedirectStandardError $StdErrLogPath -ErrorAction Stop
         $Global:DiagMsg += " - Uninstall tool process completed with Exit Code: $($process.ExitCode)."
         
         # Exit Code 3010 specifically means "A reboot is required"
