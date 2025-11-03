@@ -8,7 +8,7 @@ $Date = Get-Date -Format "MM/dd/yyyy hh:mm tt"
 
 ## HARD-CODED VARIABLES ##
 # This section is for variables that are not meant to be configured via NinjaRMM script parameters.
-$agentDownloadURL = 'https://itmedia.azureedge.net/apps/UmbrellaITSolutions-DataAgent-2512183603181.exe'
+$agentDownloadURL = 'https://github.com/Exploitacious/Windows_Toolz/raw/refs/heads/main/Helpers/CloudRadial/CloudRadialDataAgent.exe'
 $tempInstallerPath = 'C:\Temp\CloudRadialAgent.exe'
 
 ## ORG-LEVEL EXPECTED VARIABLES ##
@@ -56,9 +56,11 @@ $Global:DiagMsg += "Executed On: $Date"
 ##################################
 ######## Start of Script #########
 
-######## Start of Script #########
-
 try {
+    # --- [MODIFIED] Force TLS 1.2 for modern web requests ---
+    $Global:DiagMsg += "Setting SecurityProtocol to Tls12."
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
     # --- Get Organization Company ID ---
     $Global:DiagMsg += "Attempting to retrieve Organization Custom Field: $orgCustomFieldName"
     $companyId = $null
@@ -75,12 +77,14 @@ try {
     }
     $Global:DiagMsg += "Successfully retrieved Company ID: $companyId"
 
-    # --- Download Agent ---
-    $Global:DiagMsg += "Downloading CloudRadial agent from $agentDownloadURL to $tempInstallerPath"
+    # --- [MODIFIED] Download Agent using Invoke-WebRequest ---
+    $Global:DiagMsg += "Downloading CloudRadial agent from $agentDownloadURL to $tempInstallerPath using Invoke-WebRequest."
     try {
-        (New-Object System.Net.WebClient).DownloadFile($agentDownloadURL, $tempInstallerPath)
+        # Switched from WebClient to Invoke-WebRequest
+        Invoke-WebRequest -Uri $agentDownloadURL -OutFile $tempInstallerPath -UseBasicParsing -ErrorAction Stop
     }
     catch {
+        # This will catch more specific WebRequest errors
         throw "Failed to download agent from $agentDownloadURL. Error: $($_.Exception.Message)"
     }
     $Global:DiagMsg += "Download successful."
@@ -92,7 +96,6 @@ try {
     $Global:DiagMsg += "Arguments: $installArgs"
     
     try {
-        # Removed -PassThru, Wait-Process, and exit code checking
         Start-Process -FilePath $tempInstallerPath -ArgumentList $installArgs -ErrorAction Stop
         $Global:DiagMsg += "Installation process successfully launched."
     }
@@ -101,17 +104,34 @@ try {
     }
 
     # --- Success ---
-    # Note: Success now means the installer was launched, not that it completed.
     $Global:DiagMsg += "CloudRadial Agent installer was successfully launched."
     $Global:customFieldMessage = "CloudRadial Agent installer launched with Company ID $companyId. ($Date)"
-    # Set healthy message for this specific script
     $Global:AlertHealthy = "CloudRadial Agent installer launched successfully. | Last Checked $Date"
 
 }
 catch {
-    # Format the error message for the Custom Field
-    $errorMessage = $_.Exception.Message.Split([Environment]::NewLine)[0] # Get first line of error
-    $Global:DiagMsg += "An unexpected error occurred: $($_.Exception.Message)"
+    # --- [MODIFIED] Dig for the *real* error message (InnerException) ---
+    $errorMessage = ""
+    if ($_.Exception.InnerException) {
+        # Get the real error from the inner exception
+        $errorMessage = ($_.Exception.InnerException.Message.Split([Environment]::NewLine)[0]).Trim()
+        $Global:DiagMsg += "An unexpected error occurred (Outer): $($_.Exception.Message)"
+        $Global:DiagMsg += "INNER EXCEPTION (Real Error): $errorMessage"
+    }
+    else {
+        # Fallback to the main exception message
+        $errorMessage = ($_.Exception.Message.Split([Environment]::NewLine)[0]).Trim()
+        $Global:DiagMsg += "An unexpected error occurred: $errorMessage"
+    }
+    
+    # --- Truncate error message for Custom Field ---
+    # Max length for the error portion
+    $maxErrorLength = 130 
+    
+    if ($errorMessage.Length -gt $maxErrorLength) {
+        $errorMessage = $errorMessage.Substring(0, $maxErrorLength) + "..."
+    }
+    
     $Global:AlertMsg = "CloudRadial Agent installation FAILED to launch. See diagnostics. | Last Checked $Date"
     $Global:customFieldMessage = "CloudRadial Agent launch FAILED. Error: $errorMessage ($Date)"
 }
@@ -120,6 +140,7 @@ catch {
 ######## End of Script ###########
 ##################################
 ##################################
+
 
 # Write the collected information to the specified Custom Field before exiting.
 if ($env:customFieldName) {
