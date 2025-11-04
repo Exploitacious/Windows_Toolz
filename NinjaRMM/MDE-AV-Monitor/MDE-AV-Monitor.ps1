@@ -64,36 +64,28 @@ function Check-BitDefender {
     $bdService = Get-Service -Name $BitDefenderServiceName -ErrorAction SilentlyContinue
         
     if ($bdService -and $bdService.Status -eq 'Running') {
-        $Global:DiagMsg += "BitDefender service '$BitDefenderServiceName' is running."
+        $Global:DiagMsg += "[SUCCESS] BitDefender service '$BitDefenderServiceName' is running."
         return $true
     }
     else {
-        $Global:DiagMsg += "BitDefender service '$BitDefenderServiceName' is not running or not found. Status: $($bdService.Status)"
+        $Global:DiagMsg += "BitDefender '$BitDefenderServiceName' is not found..."
         return $false
     }
 }
 
 function Check-MDEConfiguration {
-    <#
-        .SYNOPSIS
-        Checks the Get-MpComputerStatus output against a "golden" configuration.
-        .DESCRIPTION
-        If AMRunningMode is not 'Normal', it checks for BitDefender as an acceptable alternative.
-        If AMRunningMode is 'Normal', it validates all key MDE properties.
-        .RETURNS
-        [bool] $true if compliant, $false if non-compliant.
-        #>
     $Global:DiagMsg += ""
     $Global:DiagMsg += "--- Starting MDE Configuration Check ---"
     $avStatus = Get-MpComputerStatus -ErrorAction SilentlyContinue
 
+    <# Old check
     if (-not $avStatus) {
         $Global:DiagMsg += "[CRITICAL] Failed to execute Get-MpComputerStatus. Checking for BitDefender..."
         # If MDE is gone, BitDefender *must* be running
         return (Check-BitDefender)
     }
 
-    # 1. Check AMRunningMode
+    # Check AMRunningMode / BD COmpare
     if ($avStatus.AMRunningMode -ne 'Normal') {
         $Global:DiagMsg += "AMRunningMode is '$($avStatus.AMRunningMode)'. Checking for BitDefender fallback."
         $bdRunning = Check-BitDefender
@@ -107,7 +99,13 @@ function Check-MDEConfiguration {
         }
     }
 
-    # 2. If AMRunningMode is 'Normal', check the golden configuration
+    New Check #>
+    if (-not $avStatus -or $avStatus.AMRunningMode -ne 'Normal') {
+        $Global:DiagMsg += "MDE AMRunningMode is not 'Normal' (Status: $($avStatus.AMRunningMode)). Configuration is non-compliant."
+        return $false
+    } 
+
+    # 2. If AMRunningMode is 'Normal', check the desired configuration
     $Global:DiagMsg += "Microsoft Defender is operational. Validating MDE Desired State..."
     $goldenConfig = @{
         AMServiceEnabled          = $true
@@ -213,12 +211,12 @@ function Check-MDEThreats {
         return $false
     }
 
-    # Get existing data from Custom Field
+    # 2. Get existing data from Custom Field
     $existingThreatData = $null
     $propertyObject = $null
     try {
         $propertyObject = Ninja-Property-Get -Name $threatField -ErrorAction SilentlyContinue
-            
+                
         $targetObject = $null
         if ($null -ne $propertyObject) {
             if ($propertyObject -is [array]) {
@@ -242,18 +240,23 @@ function Check-MDEThreats {
             }
         }
         else {
-            $Global:DiagMsg += "Ninja-Property-Get returned $null. Field is likely empty."
+            $Global:DiagMsg += "Previously Detected Field is likely empty."
         }
     }
     catch {
         $Global:DiagMsg += "Error reading threat data from '$threatField': $($_.Exception.Message). Assuming no previous detections."
     }
-
-    $Global:DiagMsg += "Data read from custom field: '$($existingThreatData.Substring(0, [System.Math]::Min($existingThreatData.Length, 250)))'"
-
+        
+    if (-not [string]::IsNullOrWhiteSpace($existingThreatData)) {
+        $Global:DiagMsg += "Raw data read from custom field: '$($existingThreatData.Substring(0, [System.Math]::Min($existingThreatData.Length, 250)))'"
+    }
+    else {
+        $Global:DiagMsg += " - Assuming no previous detections."
+    }
+        
     $previousThreatIDs = @{}
     if ([string]::IsNullOrWhiteSpace($existingThreatData)) {
-        $Global:DiagMsg += "Custom field value is empty or null. Assuming no previous detections."
+        $Global:DiagMsg += "Continuing to query for new threats..."
     }
     elseif ($existingThreatData -match "Previously Detected: ([\d,]+)") {
         # Use regex to find the line, no matter where it is
@@ -261,7 +264,7 @@ function Check-MDEThreats {
         $Global:DiagMsg += "Found $($previousThreatIDs.Count) previously detected threat IDs."
     }
     else {
-        $Global:DiagMsg += "Could not find 'Previously Detected:' line in custom field. Assuming no previous detections."
+        $Global:DiagMsg += "Could not find 'Previously Detected:' in custom field. Assuming no previous detections..."
     }
 
 
@@ -272,7 +275,7 @@ function Check-MDEThreats {
     $newThreatFound = $false
 
     if (-not $currentDetections) {
-        $Global:DiagMsg += "No current MDE threats found."
+        $Global:DiagMsg += "[SUCCESS] No Threats Detected via MDE."
     }
     else {
         foreach ($threat in $currentDetections) {
@@ -332,7 +335,7 @@ function Check-MDEThreats {
     elseif ($allKnownThreatIDs.Count -eq 0) {
         # This only runs if *no current threats* were found AND *no previous threats* were logged.
         # Note: $Date was not defined; replaced with (Get-Date).
-        $newCustomFieldValue = "No active threats detected. Last Checked: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+        $newCustomFieldValue = "No threats detected. Last Checked: $Date"
     }
     # If $newThreatDetails.Count is 0 but $allKnownThreatIDs.Count > 0,
     # the field will just contain the "Previously Detected: 1,2,3" line, preserving the memory.
@@ -354,44 +357,65 @@ function Check-MDEThreats {
 
 try {
     $Global:DiagMsg += "Verifying AV Presence..."
-    
-    [bool]$mdeConfigOK = $true
-    [bool]$mdeServiceOK = $true
-    [bool]$newThreatFound = $false
 
-    # Execute checks
-    $mdeConfigOK = Check-MDEConfiguration
-    $mdeServiceOK = Check-MDEService
-    $newThreatFound = Check-MDEThreats
-    
-    $Global:DiagMsg += ""
-    $Global:DiagMsg += "--- AV Summary ---"
-    $Global:DiagMsg += "MDE Service OK: $mdeServiceOK"
-    $Global:DiagMsg += "MDE Config OK: $mdeConfigOK"
-    $Global:DiagMsg += "New Threats Found: $newThreatFound"
-    $Global:DiagMsg += "------------------"
-    $Global:DiagMsg += ""
+    # 1. Check for BitDefender first
+    if (Check-BitDefender) {
+        # BitDefender is active, this is a healthy state.
+        # Skip all MDE checks.
+        $Global:DiagMsg += "BitDefender is active. Skipping MDE checks."
+        $Global:customFieldMessage = "BitDefender is active and running. See Ninja/BD for Threats. Last Checked: $Date"
+        # $Global:AlertMsg remains empty, $Global:AlertHealthy will be used
 
-
-    # Aggregate results for alerting
-    $mdeStatusString = if ($mdeConfigOK -and $mdeServiceOK) { "Compliant" } else { "Non-Compliant" }
-    $customFieldSummary = "MDE Status: $mdeStatusString | Last Connected: $Global:MDELastConnected"
-    
-    $summaryMessages = @()
-    if (-not $mdeConfigOK) { $summaryMessages += "MDE/AV Configuration is non-compliant" }
-    if (-not $mdeServiceOK) { $summaryMessages += "MDE Service (Sense) is not running or onboarded" }
-    if ($newThreatFound) { $summaryMessages += "New MDE threats detected" }
-
-    if ($summaryMessages.Count -gt 0) {
-        $alertString = $summaryMessages -join ', '
-        $Global:AlertMsg = "MDE Status Alert: $alertString. | Last Checked $Date"
-        $Global:customFieldMessage = "Alert: $alertString. | $customFieldSummary "
+        # Check for Defender Threats anyway
+        [bool]$newThreatFound = Check-MDEThreats
+        if ($newThreatFound) {
+            $Global:AlertMsg = "Windows Defender threats detected! | Last Checked $Date"
+            $Global:customFieldMessage = "Alert: Defender threats detected! See Custom Fields. | BitDefender is active and running. ($Date)"
+        }
+        else {
+            $Global:customFieldMessage = "BitDefender is active and running. No new threats detected. | Last Checked $Date"
+            # $Global:AlertMsg remains empty, $Global:AlertHealthy will be used
+        }
     }
     else {
-        $Global:customFieldMessage = " $customFieldSummary. ($Date)"
-        # $Global:AlertMsg remains empty, $Global:AlertHealthy will be used
-    }
+    
+        [bool]$mdeConfigOK = $true
+        [bool]$mdeServiceOK = $true
+        [bool]$newThreatFound = $false
 
+        # Execute checks
+        $mdeConfigOK = Check-MDEConfiguration
+        $mdeServiceOK = Check-MDEService
+        $newThreatFound = Check-MDEThreats
+    
+        $Global:DiagMsg += ""
+        $Global:DiagMsg += "--- AV Summary ---"
+        $Global:DiagMsg += "MDE Service OK: $mdeServiceOK"
+        $Global:DiagMsg += "MDE Config OK: $mdeConfigOK"
+        $Global:DiagMsg += "New Threats Found: $newThreatFound"
+        $Global:DiagMsg += "------------------"
+        $Global:DiagMsg += ""
+
+
+        # Aggregate results for alerting
+        $mdeStatusString = if ($mdeConfigOK -and $mdeServiceOK) { "Compliant" } else { "Non-Compliant" }
+        $customFieldSummary = "MDE Status: $mdeStatusString | Last Connected: $Global:MDELastConnected"
+    
+        $summaryMessages = @()
+        if (-not $mdeConfigOK) { $summaryMessages += "MDE/AV Configuration is non-compliant" }
+        if (-not $mdeServiceOK) { $summaryMessages += "MDE Service (Sense) is not running or onboarded" }
+        if ($newThreatFound) { $summaryMessages += "New MDE threats detected" }
+
+        if ($summaryMessages.Count -gt 0) {
+            $alertString = $summaryMessages -join ', '
+            $Global:AlertMsg = "MDE Status Alert: $alertString. | Last Checked: $Date"
+            $Global:customFieldMessage = "Alert: $alertString. | $customFieldSummary "
+        }
+        else {
+            $Global:customFieldMessage = " $customFieldSummary | Last Checked: $Date"
+            # $Global:AlertMsg remains empty, $Global:AlertHealthy will be used
+        }
+    }
 }
 catch {
     $Global:DiagMsg += "An unexpected error occurred: $($_.Exception.Message)"
