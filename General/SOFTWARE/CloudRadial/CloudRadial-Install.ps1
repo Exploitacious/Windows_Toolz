@@ -90,7 +90,7 @@ try {
     $Global:DiagMsg += "Download successful."
 
     # --- Install Agent (Fire and Forget) ---
-    $Global:DiagMsg += "Starting agent installation (fire and forget)..."
+    $Global:DiagMsg += "Starting agent installation..."
     $installArgs = "/companyid=$companyId /verysilent"
     $Global:DiagMsg += "Installer Path: $tempInstallerPath"
     $Global:DiagMsg += "Arguments: $installArgs"

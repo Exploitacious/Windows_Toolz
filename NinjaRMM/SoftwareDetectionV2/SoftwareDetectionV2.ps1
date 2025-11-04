@@ -32,8 +32,8 @@ $SoftwareRegPaths = @(
 ## Testing Purposes ##
 $env:alertActive = "true" # (Checkbox): If checked, the script will trigger an alert. If unchecked, it will only update the custom field.
 $env:customFieldName = "" # (Text): The name of the Text Custom Field to write the status to.
-$env:softwareName = "Threatlocker" # (Text): The DisplayName of the software to find. Supports wildcards (e.g., "*Chrome*").
-$env:serviceOrProcessName = "*79006ba60a130040*" # (Text, Optional): The name or display name of the related service or process to check.
+$env:softwareName = "CloudRadial Agent" # (Text): The DisplayName of the software to find. Supports wildcards (e.g., "*Chrome*").
+$env:serviceOrProcessName = "CloudRadial" # (Text, Optional): The name or display name of the related service or process to check.
 $env:detectionMethod = "Alert if Found" # (Dropdown): Select "Alert if Missing" or "Alert if Found".
 $env:extraRegistryKeyLabel = "Version" # (Text, Optional): The friendly label for the extra data (e.g., "Version").
 $env:extraRegistryKeyName = "DisplayVersion" # (Text, Optional): The *name* of a registry property to report (e.g., DisplayVersion).
