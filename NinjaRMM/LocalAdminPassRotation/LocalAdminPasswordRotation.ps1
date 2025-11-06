@@ -10,7 +10,7 @@ $Date = Get-Date -Format "MM/dd/yyyy hh:mm tt"
 # These values are integral to the script's function and are consistently applied across all devices.
 $LocalAdminUsername = 'UmbrellaLA'
 $AccountsToDisable = @('Administrator', 'Guest')
-$MSPDomain = 'umbrellaitgroup.com'          # The Azure AD domain whose users should be exempt from removal.
+$MSPDomain = 'umbrellaitgroup.com', 'AAD DC Administrators'          # The Azure AD domain whose users should be exempt from removal.
 $MSPNETBIOSDomain = 'Umbrella'              # The NetBIOS/local domain name to also exempt.
 $AdminNameCustomField = 'umbrellaLocalAdminName' # Text Field: Stores username and password set date.
 $AdminPassCustomField = 'umbrellaLocalAdmin'     # Secure Field: Stores the new password.
@@ -155,7 +155,7 @@ if (-not (Test-IsDomainController)) {
         foreach ($member in $adminGroupMembers) {
             $memberName = $member.Name
             # Define conditions to KEEP a user
-            $isProtectedUser = ($memberName -eq "BUILTIN\Administrators") -or ($memberName -like "*\$($LocalAdminUsername)")
+            $isProtectedUser = ($memberName -eq "BUILTIN\Administrators") -or ($memberName -eq "*\AAD DC Administrators") -or ($memberName -like "*\$($LocalAdminUsername)")
             $isMSPNETBIOSUser = ($memberName -like "$($MSPNETBIOSDomain)\*")
             $isAzureADUser = ($memberName -like "AzureAD\*") -and ($memberName.Split('\')[1] -like "*@$($MSPDomain)")
             $isUnresolvedSID = ($memberName -match '^S-\d-\d+-(\d+-){1,14}\d+$') # Regex to detect a SID
