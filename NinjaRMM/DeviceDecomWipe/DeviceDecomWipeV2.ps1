@@ -187,6 +187,14 @@ function Handle-BitLockerPrerequisites {
         }
     }
     catch {
+        if ($corruptBootloader) {
+            $Global:DiagMsg += "An error has occurred with BitLocker Pre-Requisites Check, Bootloader will be corrupted."
+            if ($finalAction -eq 'Reboot') {
+                $Global:DiagMsg += "System will reboot in 20 seconds..."
+                shutdown.exe -r -t 20
+            }
+            
+        }
         # This will catch errors from Get-BitLockerVolume OR the terminating error from Enable-BitLocker
         throw "A critical error occurred during BitLocker prerequisite handling for $mountPoint : $($_.Exception.Message)"
     }
@@ -397,21 +405,21 @@ try {
     # Disable Power Options and Sleep
     Invoke-MaximumPerformanceMode
 
-    # --- Standard Decommission Path ---
-    
-    # Handle BitLocker key backup. This will throw an error if TPM is missing and BitLocker is off.
-    Handle-BitLockerPrerequisites
-
-    # Step 1: Run the base "Quick Disable" (remove keys)
-    Invoke-QuickDisable
-
-    # Step 2: Optionally corrupt the bootloader if the checkbox is ticked
+    # Corrupt the bootloader if the checkbox is ticked
     if ($corruptBootloader) {
         Invoke-CorruptBootloader
     }
     else {
         $Global:DiagMsg += "Skipping bootloader corruption as per configuration."
     }
+
+    # --- Standard Decommission Path ---
+    
+    # Handle BitLocker key backup. This will throw an error if TPM is missing and BitLocker is off.
+    Handle-BitLockerPrerequisites
+
+    # Run the base "Quick Disable" (remove keys)
+    Invoke-QuickDisable
 
     # Step 3: Execute the chosen final action
     if ($finalAction -eq 'SecureWipe') {
