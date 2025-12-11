@@ -46,6 +46,22 @@ $Global:DiagMsg += "Executed On: " + $Date
 ##################################
 ######## Start of Script #########
 
+
+# !!!! USE THIS IN THE FUTURE !!!
+$logged_on_user = (
+    Get-WmiObject -Class win32_process -computer . -Filter "name='explorer.exe'" |
+    Foreach-Object { $_.GetOwner() } |
+    select -ExpandProperty "User"
+)
+if ($logged_on_user) {
+    LogWrite "User $logged_on_user is still logged on"
+    LogWrite "Forcing a reboot in $delay_minutes minutes, but notifying the logged on user first"
+    Write-Output "Logged in user $logged_on_user was notified they had $delay_minutes minutes before reboot"
+    Msg * "Security updates have been pending for several days.`nYour PC will be rebooted in $delay_minutes minutes to apply them.`nPlease save your work.`nThis reboot cannot be stopped."
+    shutdown -r -f -t $delay_seconds
+}
+
+
 # --- Housekeeping: Clean up orphaned scheduled tasks from previous runs ---
 $Global:DiagMsg += "Performing cleanup of any orphaned Datto RMM reboot tasks."
 try {
