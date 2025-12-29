@@ -2,18 +2,16 @@
 
 #================================================================================
 #
-#         Site: Umbrella IT Solutions
-#         FILE:  install_ninjaone_agent.sh
+#        Site: Umbrella IT Solutions
+#        FILE:  install_ninjaone_agent.sh
 #
-#        USAGE:  sudo ./install_ninjaone_agent.sh
+#       USAGE:  sudo ./install_ninjaone_agent.sh
+#               OR via curl pipe:
+#               curl -fsSL https://.../script.sh | sudo bash
 #
-#  DESCRIPTION:  Installs the NinjaOne agent on Debian-based Linux systems.
-#                - Ensures script is run with root privileges.
-#                - Verifies the OS is Debian-based (e.g., Debian, Ubuntu).
-#                - Downloads the specified agent version into a temporary directory.
-#                - Installs the agent and its dependencies using apt.
-#                - Enables and starts the agent's systemd service.
-#                - Cleans up all temporary files after installation.
+#  DESCRIPTION:  Installs NinjaOne agent on Debian/Ubuntu.
+#                - PIPE-SAFE: Prevents apt from stealing STDIN.
+#                - DYNAMIC: Auto-detects service name.
 #
 #================================================================================
 
@@ -22,16 +20,11 @@ set -e
 
 # --- Configuration ---
 # URL for the NinjaOne agent .deb package
-AGENT_URL=""
+AGENT_URL="https://us2.ninjarmm.com/agent/installer/a2a3c726-200f-4fa6-964f-9d9aabbe4a28/11.0.5635/NinjaOne-Agent-AlexTestingCribo-Cribo-Auto-x86-64.deb"
 
 # Local filename for the downloaded package
 AGENT_FILE="ninjaone_agent.deb"
-
-# The name of the systemd service for the agent
-# NOTE: This is a common name; verify if installation issues occur.
-SERVICE_NAME="ninjaagent"
 # ---------------------
-
 
 ## 1. Pre-flight Checks
 echo "--- Performing pre-flight checks..."
@@ -42,57 +35,71 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# Check for a Debian-based system by verifying the existence of /etc/debian_version
+# Check for a Debian-based system
 if ! [ -f /etc/debian_version ]; then
     echo "ERROR: This script is intended for Debian-based systems (like Ubuntu, Mint) only."
     exit 1
 fi
 echo "Checks passed: Running as root on a Debian-based system."
 
-
 ## 2. Download and Install Agent
 echo "--- Downloading and installing the NinjaOne agent..."
 
-# Create a secure, temporary directory for the download
+# Create a secure, temporary directory
 TEMP_DIR=$(mktemp -d -t ninjaone-install-XXXXXXXXXX)
 cd "$TEMP_DIR"
 echo "Created temporary directory: $TEMP_DIR"
 
 echo "Downloading the NinjaOne agent package..."
-# Use wget with -q (quiet) and -O (output file) flags
 wget -q -O "$AGENT_FILE" "$AGENT_URL"
 if [ $? -ne 0 ]; then
     echo "ERROR: Download failed. Please check the AGENT_URL and your network connection."
-    rm -rf "$TEMP_DIR" # Clean up on failure
+    rm -rf "$TEMP_DIR"
     exit 1
 fi
 echo "Download complete."
 
-echo "Installing the package and its dependencies..."
-# Update package lists to ensure dependencies are available
-apt-get update -y > /dev/null
-# Use 'apt-get install' on a local .deb file to automatically handle dependencies
-apt-get install -y "./$AGENT_FILE"
+echo "Installing the package..."
+# Update package lists - Redirecting stdin to /dev/null is CRITICAL for piped execution
+apt-get update -y > /dev/null < /dev/null
+
+# Install with non-interactive frontend and disable STDIN usage
+# This prevents apt from "eating" the rest of this script if run via curl | bash
+DEBIAN_FRONTEND=noninteractive apt-get install -y "./$AGENT_FILE" < /dev/null
+
 echo "Installation complete."
 
-
-## 3. Start and Enable Service
+## 3. Dynamic Service Detection & Start
 echo "--- Configuring the NinjaOne agent service..."
 
-# Check if the service exists before attempting to manage it
-if systemctl list-units --full --all | grep -q "$SERVICE_NAME.service"; then
-    echo "Enabling and starting the '$SERVICE_NAME' service..."
-    # Use 'enable --now' to both enable the service on boot and start it immediately
-    systemctl enable --now "$SERVICE_NAME"
-    echo "Service started and enabled successfully."
-else
-    echo "WARNING: Service '$SERVICE_NAME.service' was not found. The agent may not have installed correctly, or it may use a different service name."
-    # This is a warning, not a fatal error, as the user may need to find the correct service name manually.
-fi
+# Reload systemd daemon to recognize the new service
+systemctl daemon-reload
 
+# Dynamically find the service name. Ninja sometimes changes names (ninjaagent vs ninjarmm-agent).
+# We look for any service unit containing "ninja" in the name.
+SERVICE_NAME=$(systemctl list-unit-files --type=service --no-legend | grep -i "ninja" | head -n 1 | awk '{print $1}')
+
+if [ -n "$SERVICE_NAME" ]; then
+    echo "Detected NinjaOne service: $SERVICE_NAME"
+    
+    echo "Enabling and starting '$SERVICE_NAME'..."
+    systemctl enable --now "$SERVICE_NAME"
+    
+    # Verify it is running
+    if systemctl is-active --quiet "$SERVICE_NAME"; then
+         echo "SUCCESS: $SERVICE_NAME is running."
+    else
+         echo "WARNING: $SERVICE_NAME was enabled but is not currently active."
+    fi
+else
+    echo "WARNING: Could not auto-detect a service named *ninja*. You may need to start it manually."
+    # List all services to help user debug
+    systemctl list-unit-files --type=service | grep -i "ninja" || true
+fi
 
 ## 4. Cleanup
 echo "--- Cleaning up installation files..."
+cd /
 rm -rf "$TEMP_DIR"
 echo "Temporary directory removed."
 
