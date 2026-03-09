@@ -18,6 +18,7 @@ $scriptMap = @{
     "2" = "Gather-LogsToTimeLine.ps1"
     "3" = "Parse-LogsToTimeLine.ps1"
     "4" = "BaselineSettings.ps1"
+    "6" = "Export-EdgeHistoryToTimeline.ps1"
     "5" = "ClearWindowsEventLog.ps1"
 }
 
@@ -32,7 +33,8 @@ do {
 [ 2 ]  Gather all available Windows Event Logs and Parse them
 [ 3 ]  Parse, Merge and De-dupe gathered logs
 [ 4 ]  Audit Event Log Baseline Settings and Remediate
-[ 5 ]  DANGER: Clear all Windows Event Logs and re-apply Baseline Settings
+[ 6 ]  Export Edge Browser History to Timeline (CSV)
+[ 5 ]  DANGER: Clear all Windows Event Logs and re-apply Baseline Settings    
 [ X ]  Exit
 
 Once you exit the manager script, you can simply type 'ls' to see the scripts available, or

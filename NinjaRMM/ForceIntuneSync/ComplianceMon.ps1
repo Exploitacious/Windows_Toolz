@@ -8,6 +8,7 @@ $Date = Get-Date -Format "MM/dd/yyyy hh:mm tt"
 
 ## HARD-CODED VARIABLES ##
 $logProvider = "Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider"
+$intuneDeviceIdFieldName = "intuneDeviceId" # Added for Device ID UDF
 
 ## ORG-LEVEL EXPECTED VARIABLES ##
 # None for this script
@@ -109,6 +110,7 @@ function Get-DeviceRegistrationInfo {
         TenantId   = "N/A"
         AzureAdPrt = "No"
         NgcSet     = "No"
+        DeviceId   = "N/A"
     }
 
     try {
@@ -146,8 +148,9 @@ function Get-DeviceRegistrationInfo {
         $output.TenantId = if ($deviceState.ContainsKey('TenantId')) { $deviceState['TenantId'] } else { 'N/A' }
         $output.AzureAdPrt = if ($deviceState.ContainsKey('AzureAdPrt')) { $deviceState['AzureAdPrt'] } else { 'NO' }
         $output.NgcSet = if ($deviceState.ContainsKey('NgcSet')) { $deviceState['NgcSet'] } else { 'NO' } # (Windows Hello / WHfB)
+        $output.DeviceId = if ($deviceState.ContainsKey('DeviceId')) { $deviceState['DeviceId'] } else { 'N/A' }
 
-        $Global:DiagMsg += "[INFO] Join: $($output.JoinType), Tenant: $($output.TenantName), PRT: $($output.AzureAdPrt), WHfB: $($output.NgcSet)"
+        $Global:DiagMsg += "[INFO] Join: $($output.JoinType), Tenant: $($output.TenantName), PRT: $($output.AzureAdPrt), WHfB: $($output.NgcSet), DeviceId: $($output.DeviceId)"
     }
     catch {
         $Global:DiagMsg += "[ERROR] Failed to get device registration info: $($_.Exception.Message)"
@@ -183,6 +186,21 @@ try {
     # --- Check 1: Device Registration Info ---
     $deviceInfo = Get-DeviceRegistrationInfo
     
+    # --- Write Device ID to Custom Field ---
+    if ($deviceInfo.DeviceId -ne "N/A") {
+        $Global:DiagMsg += "Attempting to write DeviceId '$($deviceInfo.DeviceId)' to Custom Field '$intuneDeviceIdFieldName'."
+        try {
+            Ninja-Property-Set -Name $intuneDeviceIdFieldName -Value $deviceInfo.DeviceId
+            $Global:DiagMsg += "[SUCCESS] Updated DeviceId Custom Field."
+        }
+        catch {
+            $Global:DiagMsg += "[ERROR] Failed to write to Custom Field '$intuneDeviceIdFieldName': $($_.Exception.Message)"
+        }
+    }
+    else {
+        $Global:DiagMsg += "[WARNING] DeviceId was not found. Skipping update to '$intuneDeviceIdFieldName'."
+    }
+
     # --- Check 2: Registry Sync Status ---
     $regLastSuccess = Get-RegistrySyncStatus
     
@@ -279,13 +297,18 @@ catch {
 
 # Write the collected information to the specified Custom Field before exiting.
 if ($env:customFieldName) {
-    $Global:DiagMsg += "Attempting to write '$($Global:customFieldMessage)' to Custom Field '$($env:customFieldName)'."
-    try {
-        Ninja-Property-Set -Name $env:customFieldName -Value $Global:customFieldMessage
-        $Global:DiagMsg += "Successfully updated Custom Field."
+    if ($env:customFieldName -eq $intuneDeviceIdFieldName) {
+        $Global:DiagMsg += "[WARNING] The RMM parameter 'customFieldName' is set to '$intuneDeviceIdFieldName', which is reserved for the Device ID. Skipping health status write to prevent overwriting the Device ID."
     }
-    catch {
-        $Global:DiagMsg += "Error writing to Custom Field '$($env:customFieldName)': $($_.Exception.Message)"
+    else {
+        $Global:DiagMsg += "Attempting to write '$($Global:customFieldMessage)' to Custom Field '$($env:customFieldName)'."
+        try {
+            Ninja-Property-Set -Name $env:customFieldName -Value $Global:customFieldMessage
+            $Global:DiagMsg += "Successfully updated Custom Field."
+        }
+        catch {
+            $Global:DiagMsg += "Error writing to Custom Field '$($env:customFieldName)': $($_.Exception.Message)"
+        }
     }
 }
 else {
