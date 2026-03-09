@@ -1,6 +1,6 @@
 # Scan settings
 addresses = []
-ports = [1,65535]
+ports = "1-65535"
 scan_order = "random"
 scan_type = "SYN"
 

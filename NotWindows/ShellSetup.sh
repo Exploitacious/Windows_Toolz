@@ -174,13 +174,12 @@ fetch_dotfiles() {
   curl -sSLo "$USER_HOME/.config/fastfetch/config.jsonc" "$FASTFETCH_URL"
   chown -R "$DEFAULT_USER":"$DEFAULT_USER" "$USER_HOME/.config/fastfetch"
 
-  # Fetch RustScan configuration
+# Fetch RustScan configuration
   echo "Setting up RustScan configuration..."
   local RUSTSCAN_URL="https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/NotWindows/dotFiles/.rustscan.toml"
-  mkdir -p "$USER_HOME/.rustscan"
-  curl -sSLo "$USER_HOME/.rustscan/core.toml" "$RUSTSCAN_URL"
-  chown -R "$DEFAULT_USER":"$DEFAULT_USER" "$USER_HOME/.rustscan"
-}
+  curl -sSLo "$USER_HOME/.rustscan.toml" "$RUSTSCAN_URL"
+  chown "$DEFAULT_USER":"$DEFAULT_USER" "$USER_HOME/.rustscan.toml"
+  }
 
 cleanup_system() {
   echo "Cleaning up..."
