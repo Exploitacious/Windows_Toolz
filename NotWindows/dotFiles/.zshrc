@@ -42,7 +42,7 @@ alias desktop='kex --win -s'
 alias gcu="git config user.name \"Alex Ivantsov\" && git config user.email \"alex@ivantsov.tech\""
 alias myip='curl -s http://ipecho.net/plain; echo'
 alias distro='cat /etc/*-release'
-alias rustscan='sudo docker run -it --rm --name rustscan --network host --ulimit nofile=100000:100000 --privileged -v /dev:/dev -v $HOME/.rustscan.toml:/root/.rustscan.toml:ro rustscan/rustscan:2.1.1'
+alias rustscan='sudo docker run -it --rm --name rustscan --network host --ulimit nofile=100000:100000 --privileged -v $HOME/.rustscan.toml:/home/rustscan/.rustscan.toml:ro rustscan/rustscan:2.1.1'
 # Fastfetch (replaces Neofetch)
 fastfetch
 

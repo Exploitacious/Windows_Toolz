@@ -1,13 +1,17 @@
-# Scan settings
-addresses = []
-ports = "1-65535"
+# RustScan 2.1.1 Configuration
+
+[range]
+start = 1
+end = 65535
 scan_order = "random"
 scan_type = "SYN"
 
 # Performance settings
 batch_size = 10000
 timeout = 1500
-tries = 1
+tries = 2
+ulimit = 10000
+rate = 10000
 
 # Output settings
 accessible = false
@@ -16,17 +20,11 @@ json = false
 no-config = false
 
 # Nmap settings
-command = "-sV -sC -O"
-script = []
-
-# Rate limiting
-rate = 10000
+command = ["-A"]
+# script = []
 
 # DNS settings
-dns-servers = []
+# dns-servers = []
 
 # Debugging
 debug = false
-
-# Custom scripts
-scripts = []
