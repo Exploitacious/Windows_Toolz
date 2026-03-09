@@ -6,10 +6,10 @@ An interactive provisioning script for deploying a fully configured Linux enviro
 (Use any of the below)
 
 ```bash
-wget -qO setup.sh [https://shell.ivantsov.tech](https://shell.ivantsov.tech) && sudo bash setup.sh
-```
 wget -qO setup.sh https://shell.ivantsov.tech && sudo bash setup.sh
 ```
+
+```bash
 curl -fsSL https://shell.ivantsov.tech | sudo bash
 ```
 
