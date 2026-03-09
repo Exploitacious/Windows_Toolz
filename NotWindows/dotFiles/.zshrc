@@ -38,7 +38,6 @@ alias cd...='cd .. && cd ..'
 
 # Utilities
 alias connectnord='sudo /usr/local/bin/launch_nordvpn'
-alias desktop='kex --win -s'
 alias gcu="git config user.name \"Alex Ivantsov\" && git config user.email \"alex@ivantsov.tech\""
 alias myip='curl -s http://ipecho.net/plain; echo'
 alias distro='cat /etc/*-release'
@@ -50,3 +49,15 @@ fastfetch
 if [ -f "$HOME/.config/fabric/fabric-bootstrap.inc" ]; then 
   . "$HOME/.config/fabric/fabric-bootstrap.inc"
 fi
+
+# Win Kex Desktop
+unalias desktop 2>/dev/null
+desktop() {
+    echo "[*] Purging zombie KeX sessions..."
+    kex --kill >/dev/null 2>&1
+    sudo rm -rf /tmp/.X* /tmp/.x* >/dev/null 2>&1
+
+    echo "[*] Launching Win-KeX Window Mode over Bridge..."
+    # The --ip flag natively handles the 0.0.0.0 bind and Windows client routing
+    kex --win -s --ip
+}
