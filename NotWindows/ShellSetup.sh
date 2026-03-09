@@ -69,7 +69,14 @@ install_docker_engine() {
 
   # Dynamically pull the correct OS release info
   . /etc/os-release
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $VERSION_CODENAME stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  
+  # Intercept Kali rolling release and force it to use Debian Bookworm repos
+  local DOCKER_CODENAME=$VERSION_CODENAME
+  if [ "$ID" = "kali" ]; then
+    DOCKER_CODENAME="bookworm"
+  fi
+
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $DOCKER_CODENAME stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
   
   apt-get update
   apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
@@ -166,6 +173,13 @@ fetch_dotfiles() {
   mkdir -p "$USER_HOME/.config/fastfetch"
   curl -sSLo "$USER_HOME/.config/fastfetch/config.jsonc" "$FASTFETCH_URL"
   chown -R "$DEFAULT_USER":"$DEFAULT_USER" "$USER_HOME/.config/fastfetch"
+
+  # Fetch RustScan configuration
+  echo "Setting up RustScan configuration..."
+  local RUSTSCAN_URL="https://raw.githubusercontent.com/Exploitacious/Windows_Toolz/main/NotWindows/dotFiles/.rustscan.toml"
+  mkdir -p "$USER_HOME/.rustscan"
+  curl -sSLo "$USER_HOME/.rustscan/core.toml" "$RUSTSCAN_URL"
+  chown -R "$DEFAULT_USER":"$DEFAULT_USER" "$USER_HOME/.rustscan"
 }
 
 cleanup_system() {
