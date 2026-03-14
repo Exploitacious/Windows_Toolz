@@ -144,8 +144,12 @@ if [ ! -f "\$CONFIG_DIR/\$OVPN_FILE" ]; then
     exit 1
 fi
 
+echo "Kicking DNS resolver to clear DBus locks..."
+systemctl restart systemd-resolved
+sleep 1
+
 echo "Connecting to \$OVPN_FILE..."
-openvpn --config "\$CONFIG_DIR/\$OVPN_FILE"
+  openvpn --config "\$CONFIG_DIR/\$OVPN_FILE" --auth-user-pass "\$CRED_FILE"
 EOF
 
   chmod +x /usr/local/bin/launch_nordvpn
