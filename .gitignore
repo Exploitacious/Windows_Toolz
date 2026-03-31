@@ -1,0 +1,8 @@
+# Sensitive files - contains org IDs, credentials, or agent enrollment URLs
+Datto-To-Ninja/Remediation/UMBRELLAONLY-MDEDeployment.cmd
+Curl-able/Windows_Device_Decommission/Windows_Device_Decommission.ps1
+Utilities/SendTestMessage.ps1
+
+# Stale copies from Scratch repo - not part of Windows_Toolz
+M365-Tools/
+Windows_Setup/
