@@ -1,2 +1,2 @@
-# Migrated
-[This script has been migrated to Umbrella IT Group](https://github.com/Umbrella-IT-Group/Toolz)
+# Migrated to Umbrella
+[This script has been migrated and is now being maintained by Umbrella IT Group](https://github.com/Umbrella-IT-Group/Toolz)
